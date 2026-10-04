@@ -25,10 +25,18 @@ var ES = 200000;                          // модуль упругости а�
 var EB1_RED = [0.0024, 0.0028, 0.0034];   // εb1,red при продолжительном действии нагрузки (табл. 6.10)
 var DIAMETERS = [10, 12, 14, 16, 18, 20, 22, 25, 28, 32, 36, 40];
 
+// СП 20.13330.2016, табл. Д.1, поз. 2: пролёт, м → знаменатель предельного прогиба.
+// Первый набор — при высоте помещений до 6 м включительно (цифры в скобках), второй — выше 6 м.
+var LIMIT_LOW = [[1, 120], [3, 150], [6, 200], [12, 250], [24, 300]];
+var LIMIT_HIGH = [[1, 120], [3, 150], [6, 200], [24, 250], [36, 300]];
+// Понижающие коэффициенты к нагрузкам при определении прогиба (табл. Д.1, поз. 2)
+var K_LIVE = 0.35, K_SNOW = 0.5;
+
 /* =====================================================================
    Общие функции
    ===================================================================== */
 function num(v) { var x = parseFloat(String(v).replace(',', '.')); return isFinite(x) ? x : NaN; }
+function num0(v) { return String(v).trim() === '' ? 0 : num(v); }     // пустое поле нагрузки = 0
 function fmt(x, n) { return isFinite(x) ? x.toFixed(n).replace('.', ',') : '—'; }
 function r1(x) { return Math.round(x * 10) / 10; }
 function $(id) { return document.getElementById(id); }
@@ -39,24 +47,41 @@ function findSteel(name) { return STEEL.filter(function (c) { return c[0] === na
    Расчёт. Внутренние величины — в Н и мм, если не указано иное.
    ===================================================================== */
 
-// Геометрия сечения и проверка размеров; bad — поля с ошибкой
-function geometry(s) {
+// Геометрия сечения и проверка размеров; bad — поля с ошибкой.
+// needA — нужно ли расстояние a₁ до центра нижнего ряда арматуры.
+function geometry(s, needA) {
   var g = {};
   g.hasTop = s.shape === 'tee' || s.shape === 'ibeam';
   g.hasBot = s.shape === 'ibeam';
-  g.b = num(s.b); g.h = num(s.h); g.a = num(s.a);
+  g.b = num(s.b); g.h = num(s.h); g.a1 = needA ? num(s.a) : NaN;
   g.bfc = num(s.bfc); g.hfc = num(s.hfc); g.bft = num(s.bft); g.hft = num(s.hft);
-  g.h0 = g.h - g.a;
   g.wPlace = g.hasBot ? g.bft : g.b;      // ширина, по которой размещаются стержни
   var bad = {};
   if (!(g.b > 0)) bad.b = 1;
   if (!(g.h > 0)) bad.h = 1;
-  if (!(g.a > 0) || !(g.a < g.h / 2) || !(g.a < g.wPlace / 2)) bad.a = 1;
+  if (needA && (!(g.a1 > 0) || !(g.a1 < g.h / 2) || !(g.a1 < g.wPlace / 2))) bad.a = 1;
   if (g.hasTop) { if (!(g.bfc > g.b)) bad.bfc = 1; if (!(g.hfc > 0) || !(g.hfc < g.h)) bad.hfc = 1; }
   if (g.hasBot) { if (!(g.bft > g.b)) bad.bft = 1; if (!(g.hft > 0) || !(g.hfc + g.hft < g.h)) bad.hft = 1; }
   g.bad = bad;
   g.dimsOk = !Object.keys(bad).length;
   return g;
+}
+
+// Момент инерции сечения относительно центра тяжести; y — от растянутой грани.
+// al·As — приведённая площадь арматуры на расстоянии a от растянутой грани (al = 0 — только бетон).
+function sectionProps(g, al, As, a) {
+  var b = g.b, h = g.h;
+  var hT = g.hasTop ? g.hfc : 0, hB = g.hasBot ? g.hft : 0;
+  var ovT = g.hasTop ? (g.bfc - b) * hT : 0, ovB = g.hasBot ? (g.bft - b) * hB : 0;
+  var st = al > 0 ? al * As : 0, sa = al > 0 ? a : 0;
+  var A = b * h + ovT + ovB + st;
+  var S = b * h * h / 2 + ovT * (h - hT / 2) + ovB * hB / 2 + st * sa;
+  var y = S / A;
+  var I = b * h * h * h / 12 + b * h * Math.pow(h / 2 - y, 2)
+    + (g.hasTop ? (g.bfc - b) * Math.pow(hT, 3) / 12 : 0) + ovT * Math.pow(h - hT / 2 - y, 2)
+    + (g.hasBot ? (g.bft - b) * Math.pow(hB, 3) / 12 : 0) + ovB * Math.pow(hB / 2 - y, 2)
+    + st * Math.pow(y - sa, 2);
+  return { y: y, I: I };
 }
 
 // Схема: однопролётная шарнирно опёртая балка
@@ -70,9 +95,61 @@ function scheme(s) {
   };
 }
 
-// Подбор продольной арматуры по прочности нормального сечения
+/* ---------- Раскладка стержней по рядам (п. 10.3.5) ---------- */
+// Наименьшее расстояние в свету для стержней ряда: два нижних ряда — 25 мм, выше — 50 мм, и не менее диаметра
+function minClear(d, row) { return Math.max(d, row >= 2 ? 50 : 25); }
+
+// Положение стержней ряда из m штук на сетке нижнего ряда из n1 стержней: сначала крайние пары, затем средний
+function rowXs(n1, m, w, a1) {
+  var base = [];
+  for (var i = 0; i < n1; i++) base.push(n1 === 1 ? 0 : -w / 2 + a1 + i * (w - 2 * a1) / (n1 - 1));
+  if (m >= n1) return base;
+  var xs = [];
+  for (var k = 0; k < Math.floor(m / 2); k++) xs.push(base[k], base[n1 - 1 - k]);
+  if (m % 2) xs.push(0);
+  return xs.sort(function (p, q) { return p - q; });
+}
+
+// rows — число стержней в рядах снизу вверх, например [4, 2]
+function makeLayout(g, d, rows) {
+  var ys = [g.a1], xs = [], n = 0, sum = 0, clear = [], okH = true;
+  for (var r = 0; r < rows.length; r++) {
+    if (r > 0) ys.push(ys[r - 1] + d + minClear(d, r));
+    var x = rowXs(rows[0], rows[r], g.wPlace, g.a1);
+    xs.push(x);
+    var gap = Infinity;
+    for (var i = 1; i < x.length; i++) gap = Math.min(gap, x[i] - x[i - 1] - d);
+    clear.push(gap);
+    if (gap < minClear(d, r)) okH = false;
+    n += rows[r]; sum += rows[r] * ys[r];
+  }
+  return { d: d, rows: rows, n: n, area: n * Math.PI * d * d / 4, ys: ys, xs: xs, ac: sum / n, clear: clear, okH: okH,
+           label: n + 'Ø' + d + (rows.length > 1 ? ' (' + rows.join('+') + ')' : '') };
+}
+
+// Верхний ряд: не больше стержней, чем в ряду под ним; нечётное число — только при нечётном нижнем ряде
+function rowAllowed(n1, below, m) { return m >= 2 && m <= below && (m % 2 === 0 || n1 % 2 === 1); }
+
+/* ---------- Прочность нормального сечения при заданной h0 ---------- */
+function bending(g, Rb, Rs, Mn, h0) {
+  var b = g.b, bfc = g.bfc, hfc = g.hfc;
+  var xiR = 0.8 / (1 + (Rs / ES) / 0.0035), aR = xiR * (1 - 0.5 * xiR);
+  var inFlange = false, inRib = false;
+  if (g.hasTop) {
+    if (Mn <= Rb * bfc * hfc * (h0 - 0.5 * hfc)) inFlange = true; else inRib = true;
+  }
+  var am = inRib ? (Mn - Rb * (bfc - b) * hfc * (h0 - 0.5 * hfc)) / (Rb * b * h0 * h0)
+                 : Mn / (Rb * (inFlange ? bfc : b) * h0 * h0);
+  var over = am > aR;
+  var xi = over ? NaN : 1 - Math.sqrt(1 - 2 * am);
+  var asReq = over ? NaN : (inRib ? (Rb * b * xi * h0 + Rb * (bfc - b) * hfc) / Rs
+                                  : (Rb * (inFlange ? bfc : b) * xi * h0) / Rs);
+  return { over: over, am: am, aR: aR, xi: xi, xiR: xiR, asReq: asReq, inFlange: inFlange, h0: h0 };
+}
+
+// Подбор продольной арматуры; rowsSel — 'auto' или число рядов
 function strength(s, pick) {
-  var g = geometry(s), sc = scheme(s);
+  var g = geometry(s, true), sc = scheme(s);
   var conc = findConc(s.concrete), steel = findSteel(s.steel);
   var Rb = conc[1] * num(s.gb1), Rs = steel[1];
   var q = num(s.q);
@@ -82,112 +159,155 @@ function strength(s, pick) {
   var loadsOk = sc.L > 0 && q > 0;
   var inputOk = g.dimsOk && loadsOk;
   var M = sc.mom(q), Qmax = sc.shear(q), Mn = M * 1e6;
-  var b = g.b, h0 = g.h0, bfc = g.bfc, hfc = g.hfc;
+  var rowsSel = s.rows === 'auto' ? 0 : parseInt(s.rows, 10);
 
-  var xiR = 0.8 / (1 + (Rs / ES) / 0.0035);
-  var aR = xiR * (1 - 0.5 * xiR);
+  var out = { g: g, sc: sc, conc: conc, steel: steel, Rb: Rb, Rs: Rs, q: q, M: M, Qmax: Qmax, bad: bad,
+              loadsOk: loadsOk, inputOk: inputOk, rowsSel: rowsSel, base: null, cands: [], pickIdx: 0, sel: null, st: null, checks: [] };
+  if (!inputOk) return out;
 
-  // Положение границы сжатой зоны для сечений с полкой
-  var inFlange = false, inRib = false, am = NaN;
-  if (inputOk) {
-    if (g.hasTop) {
-      var Mf = Rb * bfc * hfc * (h0 - 0.5 * hfc);
-      if (Mn <= Mf) inFlange = true; else inRib = true;
-    }
-    if (inRib) am = (Mn - Rb * (bfc - b) * hfc * (h0 - 0.5 * hfc)) / (Rb * b * h0 * h0);
-    else am = Mn / (Rb * (inFlange ? bfc : b) * h0 * h0);
-  }
-  var overR = inputOk && am > aR;
-  var showResult = inputOk && !overR;
+  // Расчёт при арматуре в один ряд — для сообщений, когда подбор не удался
+  out.base = bending(g, Rb, Rs, Mn, g.h - g.a1);
 
-  var xi = showResult ? 1 - Math.sqrt(1 - 2 * am) : NaN;
-  var asReq = NaN;
-  if (showResult) {
-    asReq = inRib ? (Rb * b * xi * h0 + Rb * (bfc - b) * hfc) / Rs
-                  : (Rb * (inFlange ? bfc : b) * xi * h0) / Rs;
-  }
-  var need = Math.max(asReq, showResult ? 0.001 * b * h0 : NaN);
-
-  // Подбор по сортаменту: наименьшая площадь, стержни в один ряд
-  var cands = [];
-  if (showResult) {
-    DIAMETERS.forEach(function (d) {
-      for (var n = 2; n <= 8; n++) {
-        var area = n * Math.PI * d * d / 4;
-        if (area < need) continue;
-        var clear = (g.wPlace - 2 * g.a) / (n - 1) - d;
-        if (clear < Math.max(d, 25)) continue;
-        cands.push({ d: d, n: n, area: area, clear: clear });
-      }
-    });
-    cands.sort(function (p, c) { return (p.area - c.area) || (p.n - c.n); });
-    cands = cands.slice(0, 3);
-  }
-  var pickIdx = Math.min(pick, Math.max(cands.length - 1, 0));
-  var sel = cands.length ? cands[pickIdx] : null;
-
-  var checks = [];
-  if (sel) {
-    var mu = sel.area / (b * h0) * 100, minClear = Math.max(sel.d, 25);
-    checks = [
-      { name: 'Высота сжатой зоны', pass: xi <= xiR, detail: 'ξ = ' + fmt(xi, 3) + ' ≤ ξR = ' + fmt(xiR, 3) },
-      { name: 'Минимальный процент армирования, п. 10.3.6', pass: mu >= 0.1, detail: 'μs = ' + fmt(mu, 2) + ' % ≥ 0,1 %' },
-      { name: 'Расстояние между стержнями в свету, п. 10.3.5', pass: sel.clear >= minClear, detail: fmt(sel.clear, 0) + ' мм ≥ ' + fmt(minClear, 0) + ' мм' }
-    ];
-  }
-  return {
-    g: g, sc: sc, conc: conc, steel: steel, Rb: Rb, Rs: Rs, q: q, M: M, Qmax: Qmax, bad: bad,
-    loadsOk: loadsOk, inputOk: inputOk, overR: overR, showResult: showResult, inFlange: inFlange,
-    am: am, aR: aR, xi: xi, xiR: xiR, asReq: asReq, cands: cands, pickIdx: pickIdx, sel: sel, checks: checks
+  // Перебор раскладок: диаметр, число стержней в каждом ряду
+  var all = [];
+  var tryLayout = function (d, rows) {
+    var lay = makeLayout(g, d, rows);
+    if (!lay.okH || !(lay.ys[rows.length - 1] < g.h / 2)) return;
+    var st = bending(g, Rb, Rs, Mn, g.h - lay.ac);
+    if (st.over) return;
+    if (lay.area < Math.max(st.asReq, 0.001 * g.b * st.h0)) return;
+    lay.st = st;
+    all.push(lay);
   };
+  DIAMETERS.forEach(function (d) {
+    for (var n1 = 2; n1 <= 8; n1++) {
+      tryLayout(d, [n1]);
+      for (var n2 = 2; n2 <= n1; n2++) {
+        if (!rowAllowed(n1, n1, n2)) continue;
+        tryLayout(d, [n1, n2]);
+        for (var n3 = 2; n3 <= n2; n3++) {
+          if (rowAllowed(n1, n2, n3)) tryLayout(d, [n1, n2, n3]);
+        }
+      }
+    }
+  });
+  var want = rowsSel;
+  if (!want) { for (var R = 1; R <= 3 && !want; R++) if (all.some(function (c) { return c.rows.length === R; })) want = R; }
+  var cands = all.filter(function (c) { return c.rows.length === want; });
+  cands.sort(function (p, c) { return (p.area - c.area) || (p.ac - c.ac) || (p.n - c.n); });
+  // одно сочетание «число и диаметр» — один вариант (с самой низкой раскладкой)
+  var seen = {};
+  cands = cands.filter(function (c) { var k = c.n + '-' + c.d; if (seen[k]) return false; seen[k] = 1; return true; }).slice(0, 3);
+
+  out.cands = cands;
+  out.rowsUsed = want || 0;
+  out.pickIdx = Math.min(pick, Math.max(cands.length - 1, 0));
+  var sel = cands.length ? cands[out.pickIdx] : null;
+  out.sel = sel;
+  if (sel) {
+    var st = sel.st;
+    out.st = st;
+    var mu = sel.area / (g.b * st.h0) * 100;
+    var hDetail = sel.rows.map(function (n, r) {
+      return (sel.rows.length > 1 ? 'ряд ' + (r + 1) + ': ' : '') + fmt(sel.clear[r], 0) + ' мм ≥ ' + fmt(minClear(sel.d, r), 0) + ' мм';
+    }).join('; ');
+    out.checks = [
+      { name: 'Высота сжатой зоны', pass: st.xi <= st.xiR, detail: 'ξ = ' + fmt(st.xi, 3) + ' ≤ ξR = ' + fmt(st.xiR, 3) },
+      { name: 'Минимальный процент армирования, п. 10.3.6', pass: mu >= 0.1, detail: 'μs = ' + fmt(mu, 2) + ' % ≥ 0,1 %' },
+      { name: 'Расстояние между стержнями в ряду в свету, п. 10.3.5', pass: sel.okH, detail: hDetail }
+    ];
+    if (sel.rows.length > 1) {
+      var vDetail = [];
+      for (var r = 1; r < sel.rows.length; r++) {
+        vDetail.push('ряды ' + r + '–' + (r + 1) + ': ' + fmt(sel.ys[r] - sel.ys[r - 1] - sel.d, 0) + ' мм ≥ ' + fmt(minClear(sel.d, r), 0) + ' мм');
+      }
+      out.checks.push({ name: 'Расстояние между рядами в свету, п. 10.3.5', pass: true, detail: vDetail.join('; ') });
+    }
+  }
+  return out;
 }
 
-// Прогиб от постоянных и длительных нагрузок при заданной арматуре (продолжительное действие)
-function deflection(s) {
-  var g = geometry(s), sc = scheme(s);
-  var conc = findConc(s.concrete);
-  var n = num(s.n), d = num(s.d);
-  var qn = num(s.qn), qnl = num(s.qnl), nLim = num(s.nLim);
-  var bad = g.bad;
-  if (!(n >= 1) || n !== Math.floor(n)) bad.n = 1;
-  if (!(sc.L > 0)) bad.L = 1;
-  if (!(qn > 0)) bad.qn = 1;
-  if (!(qnl > 0) || !(qnl <= qn)) bad.qnl = 1;
-  if (!(nLim > 0)) bad.nLim = 1;
-  var barsOk = !bad.n && d > 0;
-  var As = barsOk ? n * Math.PI * d * d / 4 : NaN;
-  var loadsOk = sc.L > 0 && qn > 0 && qnl > 0 && qnl <= qn && nLim > 0;
-  var out = { g: g, sc: sc, conc: conc, bad: bad, n: n, d: d, As: As, qn: qn, qnl: qnl, nLim: nLim,
-              barsOk: barsOk, loadsOk: loadsOk, res: null };
-  if (!g.dimsOk || !barsOk || !loadsOk) return out;
+/* ---------- Предельный прогиб по СП 20.13330.2016, табл. Д.1 ---------- */
+// Линейная интерполяция предельных прогибов между табличными пролётами
+function limitSp20(L, low) {
+  var pts = (low ? LIMIT_LOW : LIMIT_HIGH).map(function (p) { return [p[0], p[0] * 1000 / p[1]]; });
+  if (L <= pts[0][0]) return L * 1000 / 120;
+  var last = pts[pts.length - 1];
+  if (L >= last[0]) return L * 1000 / 300;
+  for (var i = 1; i < pts.length; i++) {
+    if (L <= pts[i][0]) {
+      var p0 = pts[i - 1], p1 = pts[i];
+      return p0[1] + (p1[1] - p0[1]) * (L - p0[0]) / (p1[0] - p0[0]);
+    }
+  }
+  return NaN;
+}
 
-  var b = g.b, h = g.h, a = g.a, h0 = g.h0, bfc = g.bfc, hfc = g.hfc, bft = g.bft, hft = g.hft;
-  var Eb = conc[3] * 1000;
+/* ---------- Прогиб ---------- */
+// method: 'coef' — по понижающему коэффициенту жёсткости, без арматуры;
+//         'exact' — по кривизне с учётом арматуры и трещин (СП 63.13330.2018, раздел 8.2)
+function deflection(s) {
+  var exact = s.method === 'exact';
+  var g = geometry(s, exact), sc = scheme(s);
+  var conc = findConc(s.concrete);
+  var bad = g.bad;
+  if (!(sc.L > 0)) bad.L = 1;
+
+  // Нормативные нагрузки и нагрузка для прогиба по табл. Д.1 СП 20
+  var gk = num0(s.g), pk = num0(s.p), sk = num0(s.s);
+  if (!(gk >= 0)) bad.g = 1;
+  if (!(pk >= 0)) bad.p = 1;
+  if (!(sk >= 0)) bad.s = 1;
+  var loadsValid = !bad.g && !bad.p && !bad.s;
+  var ql = gk + K_LIVE * pk + K_SNOW * sk, qn = gk + pk + sk;
+  var loadsOk = loadsValid && ql > 0 && sc.L > 0;
+
+  // Предельный прогиб
+  var manual = s.limit === 'manual', nLim = num(s.nLim);
+  if (manual && !(nLim > 0)) bad.nLim = 1;
+  var fu = manual ? sc.Lmm / nLim : limitSp20(sc.L, s.limit !== 'high');
+
+  var out = { g: g, sc: sc, conc: conc, bad: bad, exact: exact, gk: gk, pk: pk, sk: sk, ql: ql, qn: qn,
+              loadsValid: loadsValid, loadsOk: loadsOk, manual: manual, fu: fu, lay: null, barsOk: true, res: null };
+
+  var Eb = conc[3] * 1000, Ml = sc.mom(ql) * 1e6;
+
+  if (!exact) {
+    var kred = num(s.kred);
+    if (!(kred > 0) || !(kred <= 1)) bad.kred = 1;
+    if (!g.dimsOk || !loadsOk || bad.kred || !(fu > 0)) return out;
+    var pr = sectionProps(g, 0, 0, 0);
+    var D0 = kred * Eb * pr.I;
+    var f0 = sc.sK * sc.Lmm * sc.Lmm * Ml / D0;
+    out.res = { f: f0, fu: fu, pass: f0 <= fu, Ml: Ml, I: pr.I, Eb: Eb, kred: kred, D: D0 };
+    return out;
+  }
+
+  // Арматура по рядам
+  var d = num(s.d), n1 = num0(s.n1), n2 = num0(s.n2), n3 = num0(s.n3);
+  var isInt = function (v) { return v >= 0 && v === Math.floor(v); };
+  if (!isInt(n1) || n1 < 1) bad.n1 = 1;
+  if (!isInt(n2) || n2 > n1) bad.n2 = 1;
+  if (!isInt(n3) || n3 > n2) bad.n3 = 1;
+  out.barsOk = !bad.n1 && !bad.n2 && !bad.n3 && d > 0;
+  if (!g.dimsOk || !out.barsOk) return out;
+  var rows = [n1]; if (n2 > 0) rows.push(n2); if (n3 > 0) rows.push(n3);
+  var lay = makeLayout(g, d, rows);
+  out.lay = lay;
+  if (!loadsOk || !(fu > 0)) return out;
+
+  var b = g.b, bfc = g.bfc, hfc = g.hfc, As = lay.area, a = lay.ac, h0 = g.h - a;
   var hi = s.hum === 'wet' ? 0 : (s.hum === 'dry' ? 2 : 1);
   var phi = conc[6 + hi], eb1 = EB1_RED[hi];
-  var hT = g.hasTop ? hfc : 0, hB = g.hasBot ? hft : 0;
-  var ovT = g.hasTop ? (bfc - b) * hfc : 0, ovB = g.hasBot ? (bft - b) * hft : 0;
-
-  // Приведённое сечение без трещин; y — от растянутой грани до центра тяжести
-  var sect = function (al) {
-    var A = b * h + ovT + ovB + al * As;
-    var S = b * h * h / 2 + ovT * (h - hT / 2) + ovB * hB / 2 + al * As * a;
-    var y = S / A;
-    var I = b * h * h * h / 12 + b * h * Math.pow(h / 2 - y, 2)
-      + (g.hasTop ? (bfc - b) * Math.pow(hT, 3) / 12 : 0) + ovT * Math.pow(h - hT / 2 - y, 2)
-      + (g.hasBot ? (bft - b) * Math.pow(hB, 3) / 12 : 0) + ovB * Math.pow(hB / 2 - y, 2)
-      + al * As * Math.pow(y - a, 2);
-    return { y: y, I: I };
-  };
-  var gr = sect(ES / Eb);
+  var gr = sectionProps(g, ES / Eb, As, a);
   var gamma = g.hasBot ? 1.15 : 1.3;
   var Mcrc = conc[5] * gamma * gr.I / gr.y;
-  var MnAll = sc.mom(qn) * 1e6, Ml = sc.mom(qnl) * 1e6;
+  var MnAll = sc.mom(qn) * 1e6;
   var cracked = MnAll > Mcrc;
   var Ired, xm = NaN, psi = NaN, Emod;
   if (!cracked) {
     Emod = Eb / (1 + phi);
-    Ired = sect(ES / Emod).I;
+    Ired = sectionProps(g, ES / Emod, As, a).I;
   } else {
     psi = Math.max(0.2, 1 - 0.8 * Mcrc / Ml);
     Emod = conc[4] / eb1;
@@ -203,8 +323,8 @@ function deflection(s) {
     Ired = Ib + aA * Math.pow(h0 - xm, 2);
   }
   var D = Emod * Ired;
-  var curv = Ml / D, f = sc.sK * sc.Lmm * sc.Lmm * curv, fu = sc.Lmm / nLim;
-  out.res = { f: f, fu: fu, pass: f <= fu, Mcrc: Mcrc, MnAll: MnAll, Ml: Ml, cracked: cracked, psi: psi, xm: xm,
+  var curv = Ml / D, f = sc.sK * sc.Lmm * sc.Lmm * curv;
+  out.res = { f: f, fu: fu, pass: f <= fu, Mcrc: Mcrc, MnAll: MnAll, Ml: Ml, cracked: cracked, psi: psi, xm: xm, h0: h0, ac: a,
               Emod: Emod, Ired: Ired, D: D, curv: curv, phi: phi, eb1: eb1, mu: As / (b * h0) * 100 };
   return out;
 }
@@ -220,8 +340,8 @@ function checkRow(name, pass, okTxt, badTxt, detail) {
     '<br><span class="d">' + detail + '</span></div></div>';
 }
 
-// Чертёж сечения; bars — {n, d} или null; barsName — подпись арматуры
-function drawSection(g, bars, barsName) {
+// Чертёж сечения; lay — раскладка арматуры (makeLayout) или null; note — подпись под чертежом
+function drawSection(g, lay, note) {
   if (!g.dimsOk) return '<div class="wait" style="text-align:center">Чертёж появится, когда размеры сечения будут заданы корректно.</div>';
   var maxW = Math.max(g.b, g.hasTop ? g.bfc : 0, g.hasBot ? g.bft : 0);
   var k = Math.min(230 / maxW, 280 / g.h);
@@ -235,22 +355,25 @@ function drawSection(g, bars, barsName) {
     [xc + wb, y0 + H], [xc - wb, y0 + H], [xc - wb, y0 + H - hB], [xc - wr, y0 + H - hB], [xc - wr, y0 + hT], [xc - wt, y0 + hT]
   ].map(function (p) { return r1(p[0]) + ',' + r1(p[1]); }).join(' ');
   var o = '<svg width="' + Math.round(W + padL + padR) + '" height="' + Math.round(H + padT + padB) + '" viewBox="0 0 ' +
-    r1(W + padL + padR) + ' ' + r1(H + padT + padB) + '" role="img" aria-label="Поперечное сечение балки с арматурой">';
+    r1(W + padL + padR) + ' ' + r1(H + padT + padB) + '" role="img" aria-label="Поперечное сечение балки">';
   o += '<polygon points="' + pts + '" fill="#DDE2E8" stroke="#15202B" stroke-width="2" stroke-linejoin="miter"/>';
-  if (bars) {
-    var rad = Math.max(bars.d * k / 2, 3);
-    for (var i = 0; i < bars.n; i++) {
-      var off = bars.n === 1 ? 0 : -g.wPlace / 2 + g.a + i * (g.wPlace - 2 * g.a) / (bars.n - 1);
-      o += '<circle cx="' + r1(xc + off * k) + '" cy="' + r1(y0 + H - g.a * k) + '" r="' + r1(rad) + '" fill="#C2410C" stroke="#7C2D12"/>';
-    }
+  if (lay) {
+    var rad = Math.max(lay.d * k / 2, 3);
+    lay.xs.forEach(function (row, r) {
+      row.forEach(function (x) {
+        o += '<circle cx="' + r1(xc + x * k) + '" cy="' + r1(y0 + H - lay.ys[r] * k) + '" r="' + r1(rad) + '" fill="#C2410C" stroke="#7C2D12"/>';
+      });
+    });
   }
   var dim = '#5B6673', tx = 'fill="#47525E" text-anchor="middle"';
   var xl = padL - 12;
   o += '<line x1="' + xl + '" y1="' + y0 + '" x2="' + xl + '" y2="' + r1(y0 + H) + '" stroke="' + dim + '"/>';
   o += '<text ' + tx + ' transform="translate(' + (xl - 8) + ' ' + r1(y0 + H / 2) + ') rotate(-90)">h = ' + fmt(g.h, 0) + '</text>';
-  var xr = padL + W + 12, yb = y0 + H - g.a * k;
-  o += '<line x1="' + r1(xr) + '" y1="' + y0 + '" x2="' + r1(xr) + '" y2="' + r1(yb) + '" stroke="' + dim + '"/>';
-  o += '<text ' + tx + ' transform="translate(' + r1(xr + 16) + ' ' + r1((y0 + yb) / 2) + ') rotate(-90)">h₀ = ' + fmt(g.h0, 0) + '</text>';
+  if (lay) {
+    var xr = padL + W + 12, yb = y0 + H - lay.ac * k;
+    o += '<line x1="' + r1(xr) + '" y1="' + y0 + '" x2="' + r1(xr) + '" y2="' + r1(yb) + '" stroke="' + dim + '"/>';
+    o += '<text ' + tx + ' transform="translate(' + r1(xr + 16) + ' ' + r1((y0 + yb) / 2) + ') rotate(-90)">h₀ = ' + fmt(g.h - lay.ac, 0) + '</text>';
+  }
   var yd = y0 + H + 12;
   o += '<line x1="' + r1(xc - wb) + '" y1="' + r1(yd) + '" x2="' + r1(xc + wb) + '" y2="' + r1(yd) + '" stroke="' + dim + '"/>';
   o += '<text ' + tx + ' x="' + r1(xc) + '" y="' + r1(yd + 16) + '">' + (g.hasBot ? 'bf = ' + fmt(g.bft, 0) : 'b = ' + fmt(g.b, 0)) + '</text>';
@@ -264,9 +387,9 @@ function drawSection(g, bars, barsName) {
     html += '<div class="mono cap" style="text-align:center">b = ' + fmt(g.b, 0) + ' · h′f = ' + fmt(g.hfc, 0) +
       (g.hasBot ? ' · hf = ' + fmt(g.hft, 0) : '') + '</div>';
   }
-  if (bars) {
+  if (lay) {
     html += '<div class="legend"><span class="dot"></span><div>Растянутая арматура <span class="mono" style="font-weight:500">' +
-      barsName + '</span>, один ряд</div></div>';
+      lay.label + (note ? ' ' + note : '') + '</span>, ' + (lay.rows.length === 1 ? 'один ряд' : 'рядов: ' + lay.rows.length) + '</div></div>';
   }
   return html + '</div>';
 }
@@ -312,6 +435,12 @@ function diagBlock(title, value, svg, hint) {
     (hint ? '<div class="hint">' + hint + '</div>' : '') + '</div>';
 }
 
+function rowsBox(rows) {
+  var o = '<div class="box rows">';
+  rows.forEach(function (r) { o += '<div><span class="k">' + r[0] + '</span><span>' + r[1] + '</span></div>'; });
+  return o + '</div>';
+}
+
 function tablesHtml(concSel, steelSel) {
   if ($('tbl-conc')) {
     $('tbl-conc').innerHTML = CONC.map(function (c) {
@@ -353,49 +482,48 @@ function shapeFields(g) {
    Страница «Армирование балки»
    ===================================================================== */
 function initReinf() {
-  var IDS = ['shape', 'b', 'h', 'bfc', 'hfc', 'bft', 'hft', 'a', 'L', 'loadType', 'q', 'concrete', 'steel', 'gb1'];
+  var IDS = ['shape', 'b', 'h', 'bfc', 'hfc', 'bft', 'hft', 'a', 'rows', 'L', 'loadType', 'q', 'concrete', 'steel', 'gb1'];
   var pick = 0;
 
   function resultHtml(m) {
     if (!m.inputOk) {
-      return '<div class="alert">Проверьте исходные данные: размеры, пролёт и расчётная нагрузка должны быть больше нуля, расстояние a — меньше половины высоты и половины ширины, полки — шире ребра и в сумме тоньше высоты сечения.</div>';
+      return '<div class="alert">Проверьте исходные данные: размеры, пролёт и расчётная нагрузка должны быть больше нуля, расстояние a₁ — меньше половины высоты и половины ширины, полки — шире ребра и в сумме тоньше высоты сечения.</div>';
     }
-    if (m.overR) {
-      return '<div class="alert">Относительная высота сжатой зоны превышает граничную (αm = ' + fmt(m.am, 3) + ' больше αR = ' + fmt(m.aR, 3) +
-        '). Одиночного армирования недостаточно: увеличьте сечение или класс бетона либо предусмотрите сжатую арматуру.</div>';
-    }
-    var o = '<div class="big-row"><div class="big"><div class="cap">Требуется по расчёту</div><div class="val">' + fmt(m.asReq, 0) + ' <small>мм²</small></div></div>';
-    if (m.sel) {
-      o += '<div class="big"><div class="cap">Принято</div><div class="val">' + m.sel.n + 'Ø' + m.sel.d + '</div><div class="cap">As = ' +
-        fmt(m.sel.area, 0) + ' мм², запас ' + fmt((m.sel.area / m.asReq - 1) * 100, 1) + ' %</div></div>';
-    }
-    o += '</div>';
     if (!m.sel) {
-      o += '<div class="alert">Требуемая арматура не размещается в один ряд при заданной ширине. Увеличьте ширину сечения или предусмотрите второй ряд.</div>';
-    } else {
-      o += '<div class="stack" style="gap:8px"><div class="cap">Варианты по сортаменту</div><div class="variants">';
-      m.cands.forEach(function (c, i) {
-        o += '<button type="button" data-pick="' + i + '" aria-pressed="' + (i === m.pickIdx) + '"><b>' + c.n + 'Ø' + c.d + '</b><small>' + fmt(c.area, 0) + ' мм²</small></button>';
-      });
-      o += '</div></div>';
+      if (m.base.over) {
+        return '<div class="alert">Относительная высота сжатой зоны превышает граничную (αm = ' + fmt(m.base.am, 3) + ' больше αR = ' + fmt(m.base.aR, 3) +
+          '). Одиночного армирования недостаточно: увеличьте сечение или класс бетона либо предусмотрите сжатую арматуру.</div>';
+      }
+      return '<div class="big-row"><div class="big"><div class="cap">Требуется при одном ряде</div><div class="val">' + fmt(m.base.asReq, 0) + ' <small>мм²</small></div></div></div>' +
+        '<div class="alert">' + (m.rowsSel
+          ? 'Арматура не подбирается при числе рядов ' + m.rowsSel + '. Выберите другое число рядов или «Авто», либо измените сечение.'
+          : 'Арматура не размещается даже в три ряда. Увеличьте сечение или класс бетона.') + '</div>';
     }
+    var st = m.st, sel = m.sel;
+    var o = '<div class="big-row"><div class="big"><div class="cap">Требуется по расчёту</div><div class="val">' + fmt(st.asReq, 0) + ' <small>мм²</small></div></div>' +
+      '<div class="big"><div class="cap">Принято</div><div class="val">' + sel.label + '</div><div class="cap">As = ' +
+      fmt(sel.area, 0) + ' мм², запас ' + fmt((sel.area / st.asReq - 1) * 100, 1) + ' %</div></div></div>';
+    o += '<div class="stack" style="gap:8px"><div class="cap">Варианты по сортаменту' + (m.rowsSel ? '' : ', рядов: ' + m.rowsUsed) + '</div><div class="variants">';
+    m.cands.forEach(function (c, i) {
+      o += '<button type="button" data-pick="' + i + '" aria-pressed="' + (i === m.pickIdx) + '"><b>' + c.label + '</b><small>' + fmt(c.area, 0) + ' мм²</small></button>';
+    });
+    o += '</div></div>';
     o += '<div class="box"><div class="kv2">' +
       '<div><span>M = </span>' + fmt(m.M, 1) + ' кН·м</div><div><span>Q = </span>' + fmt(m.Qmax, 1) + ' кН</div>' +
-      '<div><span>h₀ = </span>' + fmt(m.g.h0, 0) + ' мм</div><div><span>x = </span>' + fmt(m.xi * m.g.h0, 0) + ' мм</div>' +
-      '<div><span>αm = </span>' + fmt(m.am, 3) + '</div><div><span>αR = </span>' + fmt(m.aR, 3) + '</div>' +
-      '<div><span>ξ = </span>' + fmt(m.xi, 3) + '</div><div><span>ξR = </span>' + fmt(m.xiR, 3) + '</div></div>';
+      '<div><span>a = </span>' + fmt(sel.ac, 0) + ' мм</div><div><span>h₀ = </span>' + fmt(st.h0, 0) + ' мм</div>' +
+      '<div><span>αm = </span>' + fmt(st.am, 3) + '</div><div><span>αR = </span>' + fmt(st.aR, 3) + '</div>' +
+      '<div><span>ξ = </span>' + fmt(st.xi, 3) + '</div><div><span>ξR = </span>' + fmt(st.xiR, 3) + '</div>' +
+      '<div><span>x = </span>' + fmt(st.xi * st.h0, 0) + ' мм</div></div>';
+    if (sel.rows.length > 1) o += '<div style="color:var(--ink-2)">a — расстояние от растянутой грани до центра тяжести всей арматуры, h₀ = h − a.</div>';
     if (m.g.hasTop) {
-      o += '<div style="color:var(--ink-2)">' + (m.inFlange
+      o += '<div style="color:var(--ink-2)">' + (st.inFlange
         ? 'Граница сжатой зоны в полке: расчёт как для прямоугольного сечения шириной b′f.'
         : 'Граница сжатой зоны в ребре: учтены свесы сжатой полки.') + '</div>';
     }
     o += '</div>';
-    if (m.sel) {
-      o += '<div class="stack" style="gap:10px"><div class="cap">Проверки</div>';
-      m.checks.forEach(function (c) { o += checkRow(c.name, c.pass, 'выполняется', 'не выполняется', c.detail); });
-      o += '</div>';
-    }
-    return o;
+    o += '<div class="stack" style="gap:10px"><div class="cap">Проверки</div>';
+    m.checks.forEach(function (c) { o += checkRow(c.name, c.pass, 'выполняется', 'не выполняется', c.detail); });
+    return o + '</div>';
   }
 
   function diagHtml(m) {
@@ -414,8 +542,8 @@ function initReinf() {
     var p = ['shape', 'b', 'h', 'bfc', 'hfc', 'bft', 'hft', 'a', 'L', 'loadType', 'concrete'].map(function (id) {
       return id + '=' + encodeURIComponent(s[id]);
     });
-    p.push('n=' + m.sel.n, 'd=' + m.sel.d);
-    return '<div class="card next"><div><h2>Проверить прогиб</h2><div class="cap">Сечение, пролёт и арматура ' + m.sel.n + 'Ø' + m.sel.d +
+    p.push('method=exact', 'd=' + m.sel.d, 'n1=' + m.sel.rows[0], 'n2=' + (m.sel.rows[1] || 0), 'n3=' + (m.sel.rows[2] || 0));
+    return '<div class="card next"><div><h2>Проверить прогиб</h2><div class="cap">Сечение, пролёт и арматура ' + m.sel.label +
       ' перенесутся в расчёт прогиба. Останется задать нормативные нагрузки.</div></div>' +
       '<a class="btn" href="progib-balki.html?' + p.join('&') + '">Перейти к прогибу</a></div>';
   }
@@ -426,7 +554,7 @@ function initReinf() {
     $('lbl-q').textContent = m.sc.isQ ? 'Расчётная нагрузка q, кН/м' : 'Расчётная сила P, кН';
     markBad(IDS, m.bad);
     $('mat-used').innerHTML = '<div><span>Rb = </span>' + fmt(m.Rb, 2) + ' МПа</div><div><span>Rs = </span>' + fmt(m.Rs, 0) + ' МПа</div>';
-    $('out-section').innerHTML = drawSection(m.g, m.sel, m.sel ? m.sel.n + 'Ø' + m.sel.d + ' ' + m.steel[0] : '');
+    $('out-section').innerHTML = drawSection(m.g, m.sel, m.steel[0]);
     $('out-result').innerHTML = resultHtml(m);
     $('out-diag').innerHTML = diagHtml(m);
     $('out-next').innerHTML = nextHtml(m, s);
@@ -448,55 +576,75 @@ function initReinf() {
    Страница «Прогиб балки»
    ===================================================================== */
 function initDefl() {
-  var IDS = ['shape', 'b', 'h', 'bfc', 'hfc', 'bft', 'hft', 'a', 'n', 'd', 'L', 'loadType', 'qn', 'qnl', 'nLim', 'concrete', 'hum'];
+  var IDS = ['shape', 'b', 'h', 'bfc', 'hfc', 'bft', 'hft', 'L', 'loadType', 'g', 'p', 's', 'limit', 'nLim',
+             'method', 'kred', 'a', 'd', 'n1', 'n2', 'n3', 'hum', 'concrete'];
 
   // Данные, переданные со страницы армирования
   var params = new URLSearchParams(location.search), came = false;
   IDS.forEach(function (id) {
     if (params.has(id)) { $(id).value = params.get(id); came = true; }
   });
-  if (came && !params.has('qn')) { $('qn').value = ''; $('qnl').value = ''; }
+  if (came && !params.has('g')) { $('g').value = ''; $('p').value = ''; $('s').value = ''; }
+
+  function limitTxt(m) {
+    var den = m.sc.Lmm / m.fu;
+    return 'L/' + fmt(den, 0);
+  }
 
   function resultHtml(m) {
-    if (!m.g.dimsOk) return '<div class="alert">Проверьте размеры сечения: они должны быть больше нуля, расстояние a — меньше половины высоты и половины ширины, полки — шире ребра и в сумме тоньше высоты сечения.</div>';
-    if (!m.barsOk) return '<div class="alert">Задайте арматуру: целое число стержней и диаметр.</div>';
-    if (!m.loadsOk) {
-      if ($('qn').value === '' || $('qnl').value === '') return '<div class="wait">Задайте нормативные нагрузки, чтобы получить прогиб.</div>';
-      return '<div class="alert">Проверьте пролёт и нормативные нагрузки: все значения должны быть больше нуля, длительная нагрузка — не больше полной.</div>';
+    if (!m.g.dimsOk) return '<div class="alert">Проверьте размеры сечения: они должны быть больше нуля, полки — шире ребра и в сумме тоньше высоты сечения' +
+      (m.exact ? ', расстояние a₁ — меньше половины высоты и половины ширины' : '') + '.</div>';
+    if (m.exact && !m.barsOk) return '<div class="alert">Проверьте арматуру: в нижнем ряду — не меньше одного стержня, в каждом ряду выше — не больше, чем в ряду под ним.</div>';
+    if (!(m.sc.L > 0)) return '<div class="alert">Задайте пролёт балки.</div>';
+    if (!m.loadsValid) return '<div class="alert">Нагрузки не могут быть отрицательными.</div>';
+    if (!(m.ql > 0)) return '<div class="wait">Задайте нормативные нагрузки, чтобы получить прогиб.</div>';
+    if (!m.res) return '<div class="alert">Проверьте ' + (m.manual ? 'знаменатель предельного прогиба' : 'понижающий коэффициент: он должен быть больше 0 и не больше 1') + '.</div>';
+    var d = m.res, rows;
+    if (!m.exact) {
+      rows = [
+        ['Нагрузка для прогиба', fmt(m.ql, 2) + (m.sc.isQ ? ' кН/м' : ' кН')],
+        ['Момент M', fmt(d.Ml / 1e6, 1) + ' кН·м'],
+        ['Момент инерции бетонного сечения I', fmt(d.I / 1e4, 0) + ' см⁴'],
+        ['Модуль упругости Eb', fmt(d.Eb, 0) + ' МПа'],
+        ['Понижающий коэффициент k', fmt(d.kred, 2)],
+        ['Жёсткость D = k·Eb·I', fmt(d.D / 1e9, 0) + ' кН·м²'],
+        ['Коэффициент схемы S', m.sc.isQ ? '5/48' : '1/12'],
+        ['Формула', 'f = S·M·L² / D']
+      ];
+    } else {
+      rows = [
+        ['Арматура As', fmt(m.lay.area, 0) + ' мм², μs = ' + fmt(d.mu, 2) + ' %'],
+        ['a до центра тяжести арматуры', fmt(d.ac, 0) + ' мм, h₀ = ' + fmt(d.h0, 0) + ' мм'],
+        ['Нагрузка для прогиба', fmt(m.ql, 2) + (m.sc.isQ ? ' кН/м' : ' кН')],
+        ['Mn, полная нормативная', fmt(d.MnAll / 1e6, 1) + ' кН·м'],
+        ['Ml, для прогиба', fmt(d.Ml / 1e6, 1) + ' кН·м'],
+        ['Mcrc', fmt(d.Mcrc / 1e6, 1) + ' кН·м'],
+        ['Трещины', d.cracked ? 'образуются' : 'не образуются'],
+        ['ψs', d.cracked ? fmt(d.psi, 3) : '—'],
+        ['Высота сжатой зоны xm', d.cracked ? fmt(d.xm, 0) + ' мм' : '—'],
+        [d.cracked ? 'Eb,red = Rb,ser / εb1,red' : 'Eb1 = Eb / (1 + φb,cr)', fmt(d.Emod, 0) + ' МПа'],
+        [d.cracked ? 'εb1,red' : 'φb,cr', d.cracked ? fmt(d.eb1 * 1000, 1) + '·10⁻³' : fmt(d.phi, 1)],
+        ['Ired', fmt(d.Ired / 1e4, 0) + ' см⁴'],
+        ['Жёсткость D', fmt(d.D / 1e9, 0) + ' кН·м²'],
+        ['Кривизна 1/r', fmt(d.curv * 1e6, 2) + '·10⁻³ 1/м'],
+        ['Коэффициент схемы S', m.sc.isQ ? '5/48' : '1/12']
+      ];
     }
-    var d = m.res;
-    var rows = [
-      ['Арматура As', fmt(m.As, 0) + ' мм², μs = ' + fmt(d.mu, 2) + ' %'],
-      ['Mn, полная нормативная', fmt(d.MnAll / 1e6, 1) + ' кН·м'],
-      ['Ml, длительная', fmt(d.Ml / 1e6, 1) + ' кН·м'],
-      ['Mcrc', fmt(d.Mcrc / 1e6, 1) + ' кН·м'],
-      ['Трещины', d.cracked ? 'образуются' : 'не образуются'],
-      ['ψs', d.cracked ? fmt(d.psi, 3) : '—'],
-      ['Высота сжатой зоны xm', d.cracked ? fmt(d.xm, 0) + ' мм' : '—'],
-      [d.cracked ? 'Eb,red = Rb,ser / εb1,red' : 'Eb1 = Eb / (1 + φb,cr)', fmt(d.Emod, 0) + ' МПа'],
-      [d.cracked ? 'εb1,red' : 'φb,cr', d.cracked ? fmt(d.eb1 * 1000, 1) + '·10⁻³' : fmt(d.phi, 1)],
-      ['Ired', fmt(d.Ired / 1e4, 0) + ' см⁴'],
-      ['Жёсткость D', fmt(d.D / 1e9, 0) + ' кН·м²'],
-      ['Кривизна 1/r', fmt(d.curv * 1e6, 2) + '·10⁻³ 1/м'],
-      ['Коэффициент схемы S', m.sc.isQ ? '5/48' : '1/12']
-    ];
     var o = '<div class="big-row"><div class="big"><div class="cap">Расчётный прогиб</div><div class="val">' + fmt(d.f, 1) + ' <small>мм</small></div></div>' +
-      '<div class="big"><div class="cap">Предельный, L/' + fmt(m.nLim, 0) + '</div><div class="val">' + fmt(d.fu, 1) + ' <small>мм</small></div></div></div>';
+      '<div class="big"><div class="cap">Предельный, ' + limitTxt(m) + '</div><div class="val">' + fmt(d.fu, 1) + ' <small>мм</small></div></div></div>';
     o += checkRow('Жёсткость', d.pass, 'обеспечена', 'не обеспечена', 'f = ' + fmt(d.f, 1) + ' мм ' + (d.pass ? '≤' : '>') + ' fu = ' + fmt(d.fu, 1) + ' мм');
-    o += '<div class="box rows">';
-    rows.forEach(function (r) { o += '<div><span class="k">' + r[0] + '</span><span>' + r[1] + '</span></div>'; });
-    return o + '</div>';
+    return o + rowsBox(rows);
   }
 
   function diagHtml(m) {
     if (!(m.sc.L > 0)) return '<div class="wait" style="text-align:center">Схема появится, когда будет задан пролёт.</div>';
-    var sh = shapes(m.sc.isQ);
-    var loadTxt = m.qnl > 0 ? (m.sc.isQ ? 'qn,l = ' + fmt(m.qnl, 1) + ' кН/м' : 'Pn,l = ' + fmt(m.qnl, 1) + ' кН') : (m.sc.isQ ? 'qn,l' : 'Pn,l');
+    var sh = shapes(m.sc.isQ), unit = m.sc.isQ ? ' кН/м' : ' кН';
+    var loadTxt = m.ql > 0 ? (m.sc.isQ ? 'q = ' : 'P = ') + fmt(m.ql, 2) + unit : (m.sc.isQ ? 'q' : 'P');
     var o = '<div class="diag">' + schemeHtml(m.sc.isQ, loadTxt, m.sc.L);
     if (m.res) {
-      o += diagBlock('Эпюра M от длительной нагрузки', 'Mmax = ' + fmt(m.res.Ml / 1e6, 1) + ' кН·м', diagram(sh.m, 90, 0, 'Эпюра изгибающих моментов'), '');
+      o += diagBlock('Эпюра M от нагрузки для прогиба', 'Mmax = ' + fmt(m.res.Ml / 1e6, 1) + ' кН·м', diagram(sh.m, 90, 0, 'Эпюра изгибающих моментов'), '');
       o += diagBlock('Эпюра прогибов', 'fmax = ' + fmt(m.res.f, 1) + ' мм', diagram(sh.f, 60, 0, 'Эпюра прогибов'),
-        'Форма линии — как для балки постоянной жёсткости, наибольшая ордината — по расчёту.');
+        m.exact ? 'Форма линии — как для балки постоянной жёсткости, наибольшая ордината — по расчёту.' : '');
     }
     return o + '</div>';
   }
@@ -504,11 +652,21 @@ function initDefl() {
   function render() {
     var s = readForm(IDS), m = deflection(s);
     shapeFields(m.g);
-    $('lbl-qn').textContent = m.sc.isQ ? 'Нормативная полная qn, кН/м' : 'Нормативная полная Pn, кН';
-    $('lbl-qnl').textContent = m.sc.isQ ? 'Нормативная постоянная и длительная qn,l, кН/м' : 'Нормативная постоянная и длительная Pn,l, кН';
+    $('grp-coef').hidden = m.exact;
+    $('grp-exact').hidden = !m.exact;
+    $('grp-nlim').hidden = !m.manual;
+    var u = m.sc.isQ ? ', кН/м' : ', кН';
+    $('lbl-g').textContent = 'Постоянная' + u;
+    $('lbl-p').textContent = 'Полезная по табл. 8.3' + u;
+    $('lbl-s').textContent = 'Снеговая' + u;
     markBad(IDS, m.bad);
-    $('as-used').innerHTML = '<div><span>As = </span>' + fmt(m.As, 0) + ' мм²</div><div><span>Es = </span>2,0·10⁵ МПа</div>';
-    $('out-section').innerHTML = drawSection(m.g, m.barsOk ? { n: m.n, d: m.d } : null, m.barsOk ? m.n + 'Ø' + m.d : '');
+    $('load-used').innerHTML = m.loadsValid
+      ? '<div><span>Для прогиба: </span>' + fmt(m.gk, 2) + ' + 0,35·' + fmt(m.pk, 2) + ' + 0,5·' + fmt(m.sk, 2) + ' = ' + fmt(m.ql, 2) + '</div>' +
+        '<div><span>Полная: </span>' + fmt(m.qn, 2) + '</div>'
+      : '';
+    $('lim-used').innerHTML = m.fu > 0 ? '<div><span>fu = </span>' + fmt(m.fu, 1) + ' мм</div><div><span>это </span>' + limitTxt(m) + '</div>' : '';
+    if (m.exact) $('as-used').innerHTML = m.lay ? '<div><span>As = </span>' + fmt(m.lay.area, 0) + ' мм²</div><div><span>a = </span>' + fmt(m.lay.ac, 0) + ' мм</div>' : '';
+    $('out-section').innerHTML = drawSection(m.g, m.exact ? m.lay : null, '');
     $('out-result').innerHTML = resultHtml(m);
     $('out-diag').innerHTML = diagHtml(m);
   }

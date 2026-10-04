@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Прогиб железобетонной балки: расчёт онлайн</title>
-<meta name="description" content="Расчёт прогиба железобетонной балки по СП 63.13330.2018 с учётом трещин: кривизна, жёсткость, сравнение с предельным прогибом.">
+<meta name="description" content="Расчёт прогиба железобетонной балки: по понижающему коэффициенту жёсткости или с учётом арматуры и трещин, предельный прогиб по СП 20.13330.2016.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="style.css">
@@ -26,7 +26,7 @@
 <main>
   <div class="head">
     <h1>Прогиб балки</h1>
-    <div class="sub">Прогиб от постоянных и длительных нагрузок при заданной арматуре · однопролётная шарнирно опёртая балка · СП 63.13330.2018, раздел 8.2</div>
+    <div class="sub">Прогиб от постоянных и длительных нагрузок и сравнение с предельным по СП 20.13330.2016 · однопролётная шарнирно опёртая балка</div>
   </div>
 
   <div class="layout">
@@ -45,27 +45,23 @@
         <div class="fld"><label for="b" id="lbl-b">Ширина b, мм</label><input id="b" type="number" inputmode="decimal" min="0" value="300"></div>
         <div class="fld"><label for="h">Высота h, мм</label><input id="h" type="number" inputmode="decimal" min="0" value="600"></div>
       </div>
-      <div class="stack" id="grp-top" hidden>
-        <div class="two">
-          <div class="fld"><label for="bfc">Сжатая полка b′f, мм</label><input id="bfc" type="number" inputmode="decimal" min="0" value="900"></div>
-          <div class="fld"><label for="hfc">Толщина полки h′f, мм</label><input id="hfc" type="number" inputmode="decimal" min="0" value="100"></div>
-        </div>
-        <div class="hint">b′f — расчётная ширина полки с учётом ограничений свесов по п. 8.1.11.</div>
+      <div class="two" id="grp-top" hidden>
+        <div class="fld"><label for="bfc">Сжатая полка b′f, мм</label><input id="bfc" type="number" inputmode="decimal" min="0" value="900"></div>
+        <div class="fld"><label for="hfc">Толщина полки h′f, мм</label><input id="hfc" type="number" inputmode="decimal" min="0" value="100"></div>
       </div>
       <div class="two" id="grp-bot" hidden>
         <div class="fld"><label for="bft">Растянутая полка bf, мм</label><input id="bft" type="number" inputmode="decimal" min="0" value="500"></div>
         <div class="fld"><label for="hft">Толщина полки hf, мм</label><input id="hft" type="number" inputmode="decimal" min="0" value="120"></div>
       </div>
-      <div class="fld"><label for="a">До центра арматуры a, мм</label><input id="a" type="number" inputmode="decimal" min="0" value="50"></div>
-
-      <div class="grp sep">Растянутая арматура</div>
-      <div class="two">
-        <div class="fld"><label for="n">Число стержней</label><input id="n" type="number" inputmode="numeric" min="1" step="1" value="3"></div>
-        <div class="fld"><label for="d">Диаметр, мм</label><select id="d"><option>10</option><option>12</option><option>14</option><option>16</option><option>18</option><option>20</option><option selected>22</option><option>25</option><option>28</option><option>32</option><option>36</option><option>40</option></select></div>
+      <div class="fld">
+        <label for="concrete">Бетон тяжёлый, класс</label>
+        <select id="concrete">
+          <option>B15</option><option>B20</option><option selected>B25</option><option>B30</option><option>B35</option>
+          <option>B40</option><option>B45</option><option>B50</option><option>B55</option><option>B60</option>
+        </select>
       </div>
-      <div class="kv2" id="as-used"></div>
 
-      <div class="grp sep">Схема и нагрузки</div>
+      <div class="grp sep">Схема и нормативные нагрузки</div>
       <div class="two">
         <div class="fld"><label for="L">Пролёт L, м</label><input id="L" type="number" inputmode="decimal" min="0" step="0.1" value="6"></div>
         <div class="fld">
@@ -76,25 +72,58 @@
           </select>
         </div>
       </div>
-      <div class="fld"><label for="qn" id="lbl-qn">Нормативная полная qn, кН/м</label><input id="qn" type="number" inputmode="decimal" min="0" value="42"></div>
-      <div class="fld"><label for="qnl" id="lbl-qnl">Нормативная постоянная и длительная qn,l, кН/м</label><input id="qnl" type="number" inputmode="decimal" min="0" value="35"></div>
-      <div class="fld">
-        <label for="nLim">Предельный прогиб: L, делённый на</label>
-        <input id="nLim" type="number" inputmode="decimal" min="1" value="200">
-        <div class="hint">Знаменатель по табл. Д.1 СП 20.13330.2016.</div>
-      </div>
-
-      <div class="grp sep">Материалы и условия</div>
+      <div class="fld"><label for="g" id="lbl-g">Постоянная, кН/м</label><input id="g" type="number" inputmode="decimal" min="0" value="31.5"></div>
       <div class="two">
+        <div class="fld"><label for="p" id="lbl-p">Полезная по табл. 8.3, кН/м</label><input id="p" type="number" inputmode="decimal" min="0" value="10"></div>
+        <div class="fld"><label for="s" id="lbl-s">Снеговая, кН/м</label><input id="s" type="number" inputmode="decimal" min="0" value="0"></div>
+      </div>
+      <div class="hint">По табл. Д.1 СП 20.13330.2016 прогиб определяется от постоянных и длительных нагрузок: полезная входит с коэффициентом 0,35, снеговая — с коэффициентом 0,5. Длительные нагрузки, не входящие в табл. 8.3, добавьте к постоянной.</div>
+      <div class="kv2" id="load-used"></div>
+
+      <div class="grp sep">Предельный прогиб</div>
+      <div class="fld">
+        <label for="limit">Как определять</label>
+        <select id="limit">
+          <option value="low">Табл. Д.1 СП 20, помещения высотой до 6 м</option>
+          <option value="high">Табл. Д.1 СП 20, помещения выше 6 м</option>
+          <option value="manual">Задать вручную</option>
+        </select>
+      </div>
+      <div class="fld" id="grp-nlim" hidden>
+        <label for="nLim">Пролёт L, делённый на</label>
+        <input id="nLim" type="number" inputmode="decimal" min="1" value="200">
+      </div>
+      <div class="kv2" id="lim-used"></div>
+
+      <div class="grp sep">Жёсткость</div>
+      <div class="fld">
+        <label for="method">Способ расчёта</label>
+        <select id="method">
+          <option value="coef">По понижающему коэффициенту, без арматуры</option>
+          <option value="exact">По кривизне с учётом арматуры, СП 63</option>
+        </select>
+      </div>
+      <div class="stack" id="grp-coef">
         <div class="fld">
-          <label for="concrete">Бетон тяжёлый, класс</label>
-          <select id="concrete">
-            <option>B15</option><option>B20</option><option selected>B25</option><option>B30</option><option>B35</option>
-            <option>B40</option><option>B45</option><option>B50</option><option>B55</option><option>B60</option>
-          </select>
+          <label for="kred">Понижающий коэффициент к жёсткости Eb·I</label>
+          <input id="kred" type="number" inputmode="decimal" min="0.05" max="1" step="0.05" value="0.2">
+          <div class="hint">По п. 6.2.9 СП 430.1325800.2018 для горизонтальных элементов: 0,2 при наличии трещин, 0,3 при их отсутствии.</div>
         </div>
+      </div>
+      <div class="stack" id="grp-exact" hidden>
+        <div class="two">
+          <div class="fld"><label for="a">До центра нижнего ряда a₁, мм</label><input id="a" type="number" inputmode="decimal" min="0" value="50"></div>
+          <div class="fld"><label for="d">Диаметр, мм</label><select id="d"><option>10</option><option>12</option><option>14</option><option>16</option><option>18</option><option>20</option><option selected>22</option><option>25</option><option>28</option><option>32</option><option>36</option><option>40</option></select></div>
+        </div>
+        <div class="two" style="grid-template-columns: repeat(3, minmax(0, 1fr))">
+          <div class="fld"><label for="n1">Ряд 1, шт.</label><input id="n1" type="number" inputmode="numeric" min="1" step="1" value="3"></div>
+          <div class="fld"><label for="n2">Ряд 2, шт.</label><input id="n2" type="number" inputmode="numeric" min="0" step="1" value="0"></div>
+          <div class="fld"><label for="n3">Ряд 3, шт.</label><input id="n3" type="number" inputmode="numeric" min="0" step="1" value="0"></div>
+        </div>
+        <div class="hint">Ряды считаются снизу. Если ряда нет, оставьте 0.</div>
+        <div class="kv2" id="as-used"></div>
         <div class="fld">
-          <label for="hum">Влажность воздуха</label>
+          <label for="hum">Относительная влажность воздуха</label>
           <select id="hum">
             <option value="wet">выше 75 %</option>
             <option value="mid" selected>40–75 %</option>
@@ -123,8 +152,10 @@
   </div>
 
   <div class="notes">
-    <div>Границы применимости: однопролётная шарнирно опёртая балка без предварительного напряжения. Прогиб определён по кривизне в наиболее напряжённом сечении при продолжительном действии нагрузки; сжатая арматура и деформации сдвига не учитываются.</div>
-    <div>Трещины считаются образовавшимися, если момент от полной нормативной нагрузки превышает Mcrc. Момент трещинообразования — по Wpl = γ·Wred, где γ = 1,3, а для двутаврового сечения в запас γ = 1,15. Результат не заменяет проверку расчёта инженером.</div>
+    <div>Нагрузка для прогиба и предельный прогиб — по табл. Д.1 СП 20.13330.2016, поз. 2 (эстетико-психологические требования). Для промежуточных пролётов предельный прогиб определяется линейной интерполяцией между табличными значениями в миллиметрах.</div>
+    <div>Расчёт по понижающему коэффициенту: f = S·M·L² / (k·Eb·I), где I — момент инерции бетонного сечения без арматуры, k учитывает трещины и ползучесть. Коэффициенты 0,2 и 0,3 даны в СП 430.1325800.2018 для расчёта конструктивных систем; применимость к отдельной балке оценивает инженер.</div>
+    <div>Расчёт по кривизне: раздел 8.2 СП 63.13330.2018, кривизна в наиболее напряжённом сечении при продолжительном действии нагрузки; сжатая арматура и деформации сдвига не учитываются. Трещины считаются образовавшимися, если момент от полной нормативной нагрузки превышает Mcrc = γ·Wred·Rbt,ser, где γ = 1,3, а для двутаврового сечения в запас γ = 1,15.</div>
+    <div>Границы применимости: однопролётная шарнирно опёртая балка без предварительного напряжения. Результат не заменяет проверку расчёта инженером.</div>
   </div>
 </main>
 
