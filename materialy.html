@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Материалы: бетон и арматура по СП 63.13330.2018</title>
+<meta name="description" content="Расчётные сопротивления и модули упругости тяжёлого бетона и арматуры по СП 63.13330.2018.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="materials">
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="index.html">Расчёт ЖБК</a>
+    <nav class="nav" aria-label="Разделы">
+      <a href="index.html">Каталог</a>
+      <a href="armirovanie-balki.html">Армирование балки</a>
+      <a href="progib-balki.html">Прогиб балки</a>
+      <a href="materialy.html" class="on" aria-current="page">Материалы</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="head">
+    <h1>Материалы по СП 63.13330.2018</h1>
+    <div class="sub">Значения, которые используются в расчётах на этом сайте.</div>
+  </div>
+
+  <section class="card" aria-label="Бетон" style="gap: 12px">
+    <div>
+      <h2>Бетон тяжёлый</h2>
+      <div class="cap">Сопротивления для предельных состояний первой группы — табл. 6.8, второй группы — табл. 6.7, начальный модуль упругости — табл. 6.11, коэффициент ползучести — табл. 6.12</div>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Класс</th><th>Rb, МПа</th><th>Rbt, МПа</th><th>Rb,ser, МПа</th><th>Rbt,ser, МПа</th><th>Eb, ГПа</th><th>φb,cr при влажности выше 75 %</th><th>φb,cr при 40–75 %</th><th>φb,cr ниже 40 %</th></tr></thead>
+        <tbody id="tbl-conc"></tbody>
+      </table>
+    </div>
+    <div class="hint">Значения без коэффициента γb1. Классы выше B60 в расчёты не включены: для них меняются предельные деформации бетона. Относительные деформации εb1,red при продолжительном действии нагрузки: 2,4·10⁻³ при влажности выше 75 %, 2,8·10⁻³ при 40–75 %, 3,4·10⁻³ ниже 40 % (табл. 6.10).</div>
+  </section>
+
+  <section class="card" aria-label="Арматура" style="gap: 12px">
+    <div>
+      <h2>Арматура</h2>
+      <div class="cap">Расчётные сопротивления растяжению и сжатию, табл. 6.14</div>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Класс</th><th>Rs, МПа</th><th>Rsc, МПа</th></tr></thead>
+        <tbody id="tbl-steel"></tbody>
+      </table>
+    </div>
+    <div class="hint">Rsc в скобках — при расчёте на кратковременное действие нагрузки. Модуль упругости Es = 2,0·10⁵ МПа.</div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

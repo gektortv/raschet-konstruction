@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Армирование балки: подбор продольной арматуры онлайн</title>
+<meta name="description" content="Подбор продольной арматуры железобетонной балки по СП 63.13330.2018: прямоугольное, тавровое и двутавровое сечения, эпюры M и Q.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="reinf">
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="index.html">Расчёт ЖБК</a>
+    <nav class="nav" aria-label="Разделы">
+      <a href="index.html">Каталог</a>
+      <a href="armirovanie-balki.html" class="on" aria-current="page">Армирование балки</a>
+      <a href="progib-balki.html">Прогиб балки</a>
+      <a href="materialy.html">Материалы</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="head">
+    <h1>Армирование балки</h1>
+    <div class="sub">Подбор продольной растянутой арматуры по прочности нормального сечения · однопролётная шарнирно опёртая балка · СП 63.13330.2018</div>
+  </div>
+
+  <div class="layout">
+    <form class="card form" id="form" aria-label="Исходные данные" onsubmit="return false">
+      <h2>Исходные данные</h2>
+      <div class="grp">Сечение</div>
+      <div class="fld">
+        <label for="shape">Тип сечения</label>
+        <select id="shape">
+          <option value="rect">Прямоугольное</option>
+          <option value="tee">Тавровое, полка в сжатой зоне</option>
+          <option value="ibeam">Двутавровое</option>
+        </select>
+      </div>
+      <div class="two">
+        <div class="fld"><label for="b" id="lbl-b">Ширина b, мм</label><input id="b" type="number" inputmode="decimal" min="0" value="300"></div>
+        <div class="fld"><label for="h">Высота h, мм</label><input id="h" type="number" inputmode="decimal" min="0" value="600"></div>
+      </div>
+      <div class="stack" id="grp-top" hidden>
+        <div class="two">
+          <div class="fld"><label for="bfc">Сжатая полка b′f, мм</label><input id="bfc" type="number" inputmode="decimal" min="0" value="900"></div>
+          <div class="fld"><label for="hfc">Толщина полки h′f, мм</label><input id="hfc" type="number" inputmode="decimal" min="0" value="100"></div>
+        </div>
+        <div class="hint">b′f — расчётная ширина полки с учётом ограничений свесов по п. 8.1.11.</div>
+      </div>
+      <div class="two" id="grp-bot" hidden>
+        <div class="fld"><label for="bft">Растянутая полка bf, мм</label><input id="bft" type="number" inputmode="decimal" min="0" value="500"></div>
+        <div class="fld"><label for="hft">Толщина полки hf, мм</label><input id="hft" type="number" inputmode="decimal" min="0" value="120"></div>
+      </div>
+      <div class="fld"><label for="a">До центра арматуры a, мм</label><input id="a" type="number" inputmode="decimal" min="0" value="50"></div>
+
+      <div class="grp sep">Схема и нагрузка</div>
+      <div class="two">
+        <div class="fld"><label for="L">Пролёт L, м</label><input id="L" type="number" inputmode="decimal" min="0" step="0.1" value="6"></div>
+        <div class="fld">
+          <label for="loadType">Вид нагрузки</label>
+          <select id="loadType">
+            <option value="q">Равномерная q</option>
+            <option value="p">Сила P в середине</option>
+          </select>
+        </div>
+      </div>
+      <div class="fld"><label for="q" id="lbl-q">Расчётная нагрузка q, кН/м</label><input id="q" type="number" inputmode="decimal" min="0" value="50"></div>
+
+      <div class="grp sep">Материалы</div>
+      <div class="two">
+        <div class="fld">
+          <label for="concrete">Бетон тяжёлый, класс</label>
+          <select id="concrete">
+            <option>B15</option><option>B20</option><option selected>B25</option><option>B30</option><option>B35</option>
+            <option>B40</option><option>B45</option><option>B50</option><option>B55</option><option>B60</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label for="steel">Класс арматуры</label>
+          <select id="steel">
+            <option>A240</option><option>A400</option><option selected>A500</option><option>A600</option>
+          </select>
+        </div>
+      </div>
+      <div class="fld">
+        <label for="gb1">Коэффициент условий работы бетона γb1</label>
+        <select id="gb1">
+          <option value="1.0">1,0 — непродолжительное действие нагрузки</option>
+          <option value="0.9">0,9 — продолжительное действие нагрузки</option>
+        </select>
+      </div>
+      <div class="used">
+        <div class="cap">В расчёте, с учётом γb1</div>
+        <div class="kv2" id="mat-used"></div>
+      </div>
+    </form>
+
+    <div class="col">
+      <div class="row">
+        <section class="card f1" aria-label="Сечение">
+          <h2>Сечение, мм</h2>
+          <div id="out-section"></div>
+        </section>
+        <section class="card f13" aria-label="Подбор арматуры">
+          <h2>Подбор арматуры</h2>
+          <div class="stack" style="gap: 20px" id="out-result"></div>
+        </section>
+      </div>
+      <section class="card" aria-label="Эпюры">
+        <h2>Расчётная схема и эпюры</h2>
+        <div id="out-diag"></div>
+      </section>
+      <div id="out-next"></div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div>Границы применимости: однопролётная шарнирно опёртая балка без предварительного напряжения, одиночное армирование, растянутая арматура в один ряд, расстояние от боковых граней до центра крайних стержней принято равным a. В двутавровом сечении растянутая полка в расчёте прочности не учитывается, арматура размещается по её ширине.</div>
+    <div>Поперечная арматура не рассчитывается. Сортамент для подбора: Ø10–40 мм, от 2 до 8 стержней. Результат не заменяет проверку расчёта инженером.</div>
+  </div>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
