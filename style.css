@@ -128,3 +128,11 @@ tr.on td { background: var(--row-on); font-weight: 600; }
 .tile .meta { margin-top: auto; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); font-size: 13px; color: var(--muted); }
 .tag { font-weight: 600; color: var(--ok); }
 .sect-title { font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Вердикт проверки */
+.verdict { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 8px; border: 1px solid var(--ok); background: #EEF7F1; }
+.verdict.no { border-color: var(--bad); background: var(--bad-bg); }
+.verdict svg { width: 32px; height: 32px; flex: 0 0 auto; }
+.verdict .v { font-size: 26px; font-weight: 600; line-height: 1.2; }
+.verdict.yes .v { color: var(--ok); }
+.verdict.no .v { color: var(--bad-ink); }

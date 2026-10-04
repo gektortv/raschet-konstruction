@@ -676,11 +676,65 @@ function initDefl() {
 }
 
 /* =====================================================================
+   Страница «Проверка прогиба»: известный прогиб против предельного по СП 20
+   ===================================================================== */
+function checkDeflection(s) {
+  var f = num(s.f), L = num(s.L), cant = s.elem === 'cant';
+  var manual = s.limit === 'manual', nLim = num(s.nLim);
+  var bad = {};
+  if (!(f >= 0)) bad.f = 1;
+  if (!(L > 0)) bad.L = 1;
+  if (manual && !(nLim > 0)) bad.nLim = 1;
+  var Lcalc = cant ? 2 * L : L;                       // для консоли — удвоенный вылет
+  var fu = manual ? Lcalc * 1000 / nLim : limitSp20(Lcalc, s.limit !== 'high');
+  var ok = !bad.f && !bad.L && !bad.nLim && fu > 0;
+  return { f: f, L: L, cant: cant, manual: manual, Lcalc: Lcalc, fu: fu, bad: bad, ok: ok, pass: ok && f <= fu };
+}
+
+function initCheck() {
+  var IDS = ['f', 'L', 'elem', 'limit', 'nLim'];
+
+  $('tbl-limit').innerHTML = [['не более 1', '1/120', '1/120'], ['3', '1/150', '1/150'], ['6', '1/200', '1/200'],
+    ['12', '1/250', 'интерполяция'], ['24', '1/300', '1/250'], ['36 и более', '1/300', '1/300']].map(function (r) {
+    return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td></tr>';
+  }).join('');
+
+  function resultHtml(m) {
+    if (!m.ok) {
+      if ($('f').value === '' || $('L').value === '') return '<div class="wait">Введите прогиб и пролёт.</div>';
+      return '<div class="alert">Проверьте данные: прогиб не может быть отрицательным, пролёт и знаменатель должны быть больше нуля.</div>';
+    }
+    var mm = m.Lcalc * 1000;
+    var rows = [
+      [m.cant ? 'Расчётный пролёт l = 2 × вылет' : 'Расчётный пролёт l', fmt(m.Lcalc, 2) + ' м'],
+      ['Предельный прогиб fu', fmt(m.fu, 1) + ' мм, это l/' + fmt(mm / m.fu, 0)],
+      ['Фактический прогиб f', fmt(m.f, 1) + ' мм' + (m.f > 0 ? ', это l/' + fmt(mm / m.f, 0) : '')],
+      ['Использование f / fu', fmt(m.f / m.fu * 100, 0) + ' %'],
+      [m.pass ? 'Запас' : 'Превышение', fmt(Math.abs(m.fu - m.f), 1) + ' мм']
+    ];
+    return '<div class="verdict ' + (m.pass ? 'yes' : 'no') + '">' + (m.pass ? ICON_OK : ICON_BAD) +
+      '<div><div class="v">' + (m.pass ? 'Проходит' : 'Не проходит') + '</div><div class="mono">f = ' + fmt(m.f, 1) + ' мм ' +
+      (m.pass ? '≤' : '>') + ' fu = ' + fmt(m.fu, 1) + ' мм</div></div></div>' + rowsBox(rows);
+  }
+
+  function render() {
+    var m = checkDeflection(readForm(IDS));
+    $('grp-nlim').hidden = !m.manual;
+    $('lbl-L').textContent = m.cant ? 'Вылет консоли, м' : 'Пролёт L, м';
+    markBad(IDS, m.bad);
+    $('out-result').innerHTML = resultHtml(m);
+  }
+  $('form').addEventListener('input', render);
+  render();
+}
+
+/* =====================================================================
    Запуск по типу страницы
    ===================================================================== */
 (function () {
   var page = document.body.getAttribute('data-page');
   if (page === 'reinf') initReinf();
   if (page === 'defl') initDefl();
+  if (page === 'check') initCheck();
   if (page === 'materials') tablesHtml('', '');
 })();

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка прогиба по СП 20.13330.2016 онлайн</title>
+<meta name="description" content="Проверка прогиба балки или плиты по предельному прогибу из табл. Д.1 СП 20.13330.2016: введите прогиб и пролёт.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="check">
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="index.html">Расчёт ЖБК</a>
+    <nav class="nav" aria-label="Разделы">
+      <a href="index.html">Каталог</a>
+      <a href="armirovanie-balki.html">Армирование балки</a>
+      <a href="progib-balki.html">Прогиб балки</a>
+      <a href="proverka-progiba.html" class="on" aria-current="page">Проверка прогиба</a>
+      <a href="materialy.html">Материалы</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="head">
+    <h1>Проверка прогиба</h1>
+    <div class="sub">Введите прогиб из своего расчёта и пролёт — получите предельный прогиб по табл. Д.1 СП 20.13330.2016 и ответ, проходит ли элемент.</div>
+  </div>
+
+  <div class="layout">
+    <form class="card form" id="form" aria-label="Исходные данные" onsubmit="return false">
+      <h2>Исходные данные</h2>
+      <div class="two">
+        <div class="fld"><label for="f">Прогиб f, мм</label><input id="f" type="number" inputmode="decimal" min="0" step="0.1" value="18"></div>
+        <div class="fld"><label for="L" id="lbl-L">Пролёт L, м</label><input id="L" type="number" inputmode="decimal" min="0" step="0.1" value="6"></div>
+      </div>
+      <div class="fld">
+        <label for="elem">Элемент</label>
+        <select id="elem">
+          <option value="span">Балка или плита в пролёте</option>
+          <option value="cant">Консоль</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label for="limit">Предельный прогиб</label>
+        <select id="limit">
+          <option value="low">Табл. Д.1 СП 20, помещения высотой до 6 м</option>
+          <option value="high">Табл. Д.1 СП 20, помещения выше 6 м</option>
+          <option value="manual">Задать вручную</option>
+        </select>
+      </div>
+      <div class="fld" id="grp-nlim" hidden>
+        <label for="nLim">Расчётный пролёт, делённый на</label>
+        <input id="nLim" type="number" inputmode="decimal" min="1" value="200">
+      </div>
+      <div class="hint">Прогиб берётся от постоянных и длительных нагрузок: полезная по табл. 8.3 входит с коэффициентом 0,35, снеговая — с коэффициентом 0,5.</div>
+    </form>
+
+    <div class="col">
+      <section class="card" aria-label="Результат">
+        <h2>Результат</h2>
+        <div class="stack" style="gap: 18px" id="out-result"></div>
+      </section>
+      <section class="card" aria-label="Таблица Д.1" style="gap: 12px">
+        <div>
+          <h2>Табл. Д.1 СП 20.13330.2016, поз. 2</h2>
+          <div class="cap">Балки, фермы, ригели, прогоны, плиты, настилы покрытий и перекрытий, открытых для обзора. Эстетико-психологические требования.</div>
+        </div>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Пролёт l, м</th><th>Помещения до 6 м</th><th>Помещения выше 6 м</th></tr></thead>
+            <tbody id="tbl-limit"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div>Для промежуточных пролётов предельный прогиб определяется линейной интерполяцией между табличными значениями в миллиметрах. Для консоли вместо l принимается удвоенный вылет (примечание 1 к табл. Д.1).</div>
+    <div>Проверяются только эстетико-психологические требования. Технологические, конструктивные и физиологические требования, если они есть, проверяются отдельно. Результат не заменяет проверку расчёта инженером.</div>
+  </div>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
