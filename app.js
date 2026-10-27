@@ -229,15 +229,18 @@ function strength(s, pick) {
 
 /* ---------- Предельный прогиб по СП 20.13330.2016, табл. Д.1 ---------- */
 // Линейная интерполяция предельных прогибов между табличными пролётами
-function limitSp20(L, low) {
-  var pts = (low ? LIMIT_LOW : LIMIT_HIGH).map(function (p) { return [p[0], p[0] * 1000 / p[1]]; });
-  if (L <= pts[0][0]) return L * 1000 / 120;
-  var last = pts[pts.length - 1];
-  if (L >= last[0]) return L * 1000 / 300;
-  for (var i = 1; i < pts.length; i++) {
-    if (L <= pts[i][0]) {
-      var p0 = pts[i - 1], p1 = pts[i];
-      return p0[1] + (p1[1] - p0[1]) * (L - p0[0]) / (p1[0] - p0[0]);
+// byDen = false — интерполируются предельные прогибы в мм; true — интерполируются знаменатели n в L/n
+function limitSp20(L, low, byDen) {
+  var tbl = low ? LIMIT_LOW : LIMIT_HIGH;
+  if (L <= tbl[0][0]) return L * 1000 / tbl[0][1];
+  var last = tbl[tbl.length - 1];
+  if (L >= last[0]) return L * 1000 / last[1];
+  for (var i = 1; i < tbl.length; i++) {
+    if (L <= tbl[i][0]) {
+      var t0 = tbl[i - 1], t1 = tbl[i], k = (L - t0[0]) / (t1[0] - t0[0]);
+      if (byDen) return L * 1000 / (t0[1] + (t1[1] - t0[1]) * k);
+      var f0 = t0[0] * 1000 / t0[1], f1 = t1[0] * 1000 / t1[1];
+      return f0 + (f1 - f0) * k;
     }
   }
   return NaN;
@@ -265,7 +268,7 @@ function deflection(s) {
   // Предельный прогиб
   var manual = s.limit === 'manual', nLim = num(s.nLim);
   if (manual && !(nLim > 0)) bad.nLim = 1;
-  var fu = manual ? sc.Lmm / nLim : limitSp20(sc.L, s.limit !== 'high');
+  var fu = manual ? sc.Lmm / nLim : limitSp20(sc.L, s.limit !== 'high', s.interp === 'den');
 
   var out = { g: g, sc: sc, conc: conc, bad: bad, exact: exact, gk: gk, pk: pk, sk: sk, ql: ql, qn: qn,
               loadsValid: loadsValid, loadsOk: loadsOk, manual: manual, fu: fu, lay: null, barsOk: true, res: null };
@@ -576,7 +579,7 @@ function initReinf() {
    Страница «Прогиб балки»
    ===================================================================== */
 function initDefl() {
-  var IDS = ['shape', 'b', 'h', 'bfc', 'hfc', 'bft', 'hft', 'L', 'loadType', 'g', 'p', 's', 'limit', 'nLim',
+  var IDS = ['shape', 'b', 'h', 'bfc', 'hfc', 'bft', 'hft', 'L', 'loadType', 'g', 'p', 's', 'limit', 'interp', 'nLim',
              'method', 'kred', 'a', 'd', 'n1', 'n2', 'n3', 'hum', 'concrete'];
 
   // Данные, переданные со страницы армирования
@@ -655,6 +658,7 @@ function initDefl() {
     $('grp-coef').hidden = m.exact;
     $('grp-exact').hidden = !m.exact;
     $('grp-nlim').hidden = !m.manual;
+    $('grp-interp').hidden = m.manual;
     var u = m.sc.isQ ? ', кН/м' : ', кН';
     $('lbl-g').textContent = 'Постоянная' + u;
     $('lbl-p').textContent = 'Полезная по табл. 8.3' + u;
@@ -686,13 +690,13 @@ function checkDeflection(s) {
   if (!(L > 0)) bad.L = 1;
   if (manual && !(nLim > 0)) bad.nLim = 1;
   var Lcalc = cant ? 2 * L : L;                       // для консоли — удвоенный вылет
-  var fu = manual ? Lcalc * 1000 / nLim : limitSp20(Lcalc, s.limit !== 'high');
+  var fu = manual ? Lcalc * 1000 / nLim : limitSp20(Lcalc, s.limit !== 'high', s.interp === 'den');
   var ok = !bad.f && !bad.L && !bad.nLim && fu > 0;
   return { f: f, L: L, cant: cant, manual: manual, Lcalc: Lcalc, fu: fu, bad: bad, ok: ok, pass: ok && f <= fu };
 }
 
 function initCheck() {
-  var IDS = ['f', 'L', 'elem', 'limit', 'nLim'];
+  var IDS = ['f', 'L', 'elem', 'limit', 'interp', 'nLim'];
 
   $('tbl-limit').innerHTML = [['не более 1', '1/120', '1/120'], ['3', '1/150', '1/150'], ['6', '1/200', '1/200'],
     ['12', '1/250', 'интерполяция'], ['24', '1/300', '1/250'], ['36 и более', '1/300', '1/300']].map(function (r) {
@@ -720,6 +724,7 @@ function initCheck() {
   function render() {
     var m = checkDeflection(readForm(IDS));
     $('grp-nlim').hidden = !m.manual;
+    $('grp-interp').hidden = m.manual;
     $('lbl-L').textContent = m.cant ? 'Вылет консоли, м' : 'Пролёт L, м';
     markBad(IDS, m.bad);
     $('out-result').innerHTML = resultHtml(m);
