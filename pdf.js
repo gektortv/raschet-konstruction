@@ -64,16 +64,26 @@ var Pdf = (function () {
     return { buf: buf, upm: upm, bbox: bbox, ascent: ascent, descent: descent, gid: gid, adv: adv };
   }
 
+  // Шрифты лежат рядом со страницей в font-regular.js и font-bold.js и подгружаются только при первом PDF.
+  // Подключение через <script> работает и на сайте, и при открытии страницы из файла.
+  function loadScript(src) {
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script');
+      s.src = src; s.onload = res;
+      s.onerror = function () { rej(new Error('Не загрузился файл шрифта ' + src.split('?')[0])); };
+      document.head.appendChild(s);
+    });
+  }
+  function b64ToBuf(b64) {
+    var bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return u8.buffer;
+  }
   function loadFonts() {
     if (fontCache) return fontCache;
-    var get = function (name) {
-      return fetch('fonts/' + name).then(function (r) {
-        if (!r.ok) throw new Error('font');
-        return r.arrayBuffer();
-      });
-    };
-    fontCache = Promise.all([get('LiberationSerif-Regular.ttf'), get('LiberationSerif-Bold.ttf')]).then(function (b) {
-      return { R: parseTTF(b[0]), B: parseTTF(b[1]) };
+    var have = window.PDF_FONTS && window.PDF_FONTS.R && window.PDF_FONTS.B;
+    fontCache = (have ? Promise.resolve() : Promise.all([loadScript('font-regular.js?v=8'), loadScript('font-bold.js?v=8')])).then(function () {
+      return { R: parseTTF(b64ToBuf(window.PDF_FONTS.R)), B: parseTTF(b64ToBuf(window.PDF_FONTS.B)) };
     });
     fontCache.catch(function () { fontCache = null; });
     return fontCache;
@@ -83,10 +93,13 @@ var Pdf = (function () {
   function clean(s) { return String(s).replace(/⁻/g, '-').replace(/\t/g, ' ').replace(/\s+/g, ' ').trim(); }
   function hexColor(h) { h = h || '000000'; return [parseInt(h.substr(0, 2), 16) / 255, parseInt(h.substr(2, 2), 16) / 255, parseInt(h.substr(4, 2), 16) / 255]; }
   function n2(x) { return (Math.round(x * 100) / 100).toString(); }
+  // Сжатие шрифта, если браузер умеет; иначе шрифт встраивается без сжатия
   function deflate(u8) {
-    if (typeof CompressionStream === 'undefined') return Promise.resolve(null);
-    var s = new Blob([u8]).stream().pipeThrough(new CompressionStream('deflate'));
-    return new Response(s).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+    try {
+      if (typeof CompressionStream === 'undefined' || !Blob.prototype.stream) return Promise.resolve(null);
+      var s = new Blob([u8]).stream().pipeThrough(new CompressionStream('deflate'));
+      return new Response(s).arrayBuffer().then(function (b) { return new Uint8Array(b); }, function () { return null; });
+    } catch (e) { return Promise.resolve(null); }
   }
   // Любая картинка → JPEG на белом фоне (DCTDecode встраивается в PDF как есть)
   function toJpeg(img) {
@@ -309,11 +322,11 @@ var Pdf = (function () {
 
   function download(m, name) {
     return make(m).then(function (blob) {
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = String(name || m.title || 'Отчёт').replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.pdf';
+      var file = String(name || m.title || 'Отчёт').replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.pdf';
+      var url = URL.createObjectURL(blob), a = document.createElement('a');
+      a.href = url; a.download = file;
       document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+      return { url: url, file: file };
     });
   }
 

@@ -289,8 +289,8 @@ var Report = (function () {
     $('rep-pdf').addEventListener('click', function () {
       var btn = this; btn.disabled = true; $('rep-msg').textContent = 'Готовлю PDF…';
       Pdf.download(model(), $('rep-title').value.trim() || 'Проверка прогибов')
-        .then(function () { $('rep-msg').textContent = ''; })
-        .catch(function () { $('rep-msg').textContent = 'Не удалось собрать PDF. Если сайт открыт из файла на компьютере, откройте его по ссылке в интернете или воспользуйтесь кнопкой «Печать».'; })
+        .then(function (res) { pdfReady(res); })
+        .catch(function (e) { $('rep-msg').textContent = 'Не удалось собрать PDF: ' + (e && e.message ? e.message : 'ошибка') + '. Можно скачать Word или воспользоваться печатью.'; })
         .then(function () { btn.disabled = false; });
     });
     $('rep-print').addEventListener('click', function () { refresh(); window.print(); });

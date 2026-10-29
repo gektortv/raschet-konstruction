@@ -513,6 +513,12 @@ function setupShare(key, ids) {
 }
 
 /* ---------- Отчёт: общие кнопки, реквизиты, печать ---------- */
+// Готовый PDF: ссылка на случай, если браузер (например, на iPhone) не начал загрузку сам
+function pdfReady(r) {
+  var box = $('rep-msg');
+  if (!box) return;
+  box.innerHTML = 'PDF готов. Если загрузка не началась, <a href="' + r.url + '" download="' + r.file.replace(/"/g, '') + '" target="_blank" rel="noopener">откройте PDF по этой ссылке</a>.';
+}
 function reportMeta() {
   return [['Объект', $('rep-object').value.trim()], ['Выполнил', $('rep-author').value.trim()], ['Дата', new Date().toLocaleDateString('ru-RU')]];
 }
@@ -543,8 +549,8 @@ function setupReport(build, fileName) {
   });
   if ($('rep-pdf')) $('rep-pdf').addEventListener('click', function () {
     var b = this; b.disabled = true; msg('Готовлю PDF…');
-    make().then(function (m) { if (m) return Pdf.download(m, fileName()).then(function () { msg(''); }); })
-      .catch(function () { msg('Не удалось собрать PDF. Если сайт открыт из файла на компьютере, откройте его по ссылке в интернете или воспользуйтесь кнопкой «Печать».'); })
+    make().then(function (m) { if (m) return Pdf.download(m, fileName()).then(function (r) { pdfReady(r); }); })
+      .catch(function (e) { msg('Не удалось собрать PDF: ' + (e && e.message ? e.message : 'ошибка') + '. Можно скачать Word или воспользоваться печатью.'); })
       .then(function () { b.disabled = false; });
   });
   $('rep-print').addEventListener('click', function () {
