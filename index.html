@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Расчёт ЖБК: онлайн-расчёты железобетонных конструкций</title>
-<meta name="description" content="Бесплатные онлайн-расчёты железобетонных балок по СП 63.13330.2018: подбор арматуры, эпюры, прогиб.">
+<meta name="description" content="Бесплатные онлайн-расчёты железобетонных конструкций по СП 63.13330.2018 и СП 20.13330.2016: сбор нагрузок, армирование и прогиб балки, продавливание, анкеровка, отчёты в Word.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body data-page="index">
 
@@ -15,10 +15,9 @@
   <div class="top-in">
     <a class="brand" href="index.html">Расчёт ЖБК</a>
     <nav class="nav" aria-label="Разделы">
-      <a href="index.html" class="on" aria-current="page">Каталог</a>
-      <a href="armirovanie-balki.html">Армирование балки</a>
-      <a href="progib-balki.html">Прогиб балки</a>
-      <a href="proverka-progiba.html">Проверка прогиба</a>
+      <a href="index.html" class="on" aria-current="page">Расчёты</a>
+      <a href="primery.html">Проверочные примеры</a>
+      <a href="stati.html">Статьи</a>
       <a href="materialy.html">Материалы</a>
     </nav>
   </div>
@@ -27,42 +26,78 @@
 <main>
   <div class="head">
     <h1>Расчёты железобетонных конструкций</h1>
-    <div class="sub">Онлайн-расчёты по СП 63.13330.2018 с открытыми промежуточными величинами: каждое число можно проверить вручную. Без регистрации.</div>
+    <div class="sub">Онлайн-расчёты по СП 63.13330.2018 и СП 20.13330.2016 с открытыми промежуточными величинами: каждое число можно проверить вручную. По каждому расчёту — отчёт в Word. Без регистрации.</div>
+  </div>
+
+  <div class="sect-title">Нагрузки</div>
+  <div class="catalog">
+    <a class="tile" href="sbor-nagruzok.html">
+      <h3>Сбор нагрузок</h3>
+      <p>Слои пола и плиты, перегородки, полезная нагрузка по табл. 8.3. Расчётная, нормативная и для прогиба — на 1 м² и на балку, с переносом в расчёты.</p>
+      <div class="meta"><span>СП 20.13330.2016</span><span class="tag">Бесплатно, с отчётом</span></div>
+    </a>
   </div>
 
   <div class="sect-title">Балки</div>
   <div class="catalog">
     <a class="tile" href="armirovanie-balki.html">
       <h3>Армирование балки</h3>
-      <p>Подбор продольной арматуры в один, два или три ряда. Прямоугольное, тавровое и двутавровое сечения, эпюры M и Q, варианты по сортаменту.</p>
-      <div class="meta"><span>СП 63.13330.2018, раздел 8.1</span><span class="tag">Бесплатно</span></div>
+      <p>Продольная арматура в один, два или три ряда и хомуты по наклонному сечению. Прямоугольное, тавровое и двутавровое сечения, эпюры M и Q.</p>
+      <div class="meta"><span>СП 63.13330.2018, 8.1</span><span class="tag">Бесплатно, с отчётом</span></div>
     </a>
     <a class="tile" href="progib-balki.html">
       <h3>Прогиб балки</h3>
-      <p>Прогиб по понижающему коэффициенту жёсткости без арматуры или по кривизне с учётом арматуры и трещин. Нагрузки и предельный прогиб по СП 20.</p>
-      <div class="meta"><span>СП 20.13330.2016, СП 63.13330.2018</span><span class="tag">Бесплатно</span></div>
+      <p>Прогиб по понижающему коэффициенту жёсткости или по кривизне с учётом арматуры и трещин. Нагрузки и предельный прогиб по СП 20.</p>
+      <div class="meta"><span>СП 20.13330.2016, СП 63.13330.2018</span><span class="tag">Бесплатно, с отчётом</span></div>
     </a>
+  </div>
+
+  <div class="sect-title">Плиты</div>
+  <div class="catalog">
     <a class="tile" href="proverka-progiba.html">
-      <h3>Проверка прогиба</h3>
-      <p>Введите прогиб и пролёт — получите предельный прогиб по СП 20 и ответ, проходит элемент или нет.</p>
-      <div class="meta"><span>СП 20.13330.2016, табл. Д.1</span><span class="tag">Бесплатно</span></div>
+      <h3>Проверка прогибов и отчёт</h3>
+      <p>Прогиб из расчётного комплекса против предельного по табл. Д.1. Отчёт по этажам с картинками, ввод списком из Excel.</p>
+      <div class="meta"><span>СП 20.13330.2016, табл. Д.1</span><span class="tag">Бесплатно, с отчётом</span></div>
+    </a>
+    <a class="tile" href="prodavlivanie.html">
+      <h3>Продавливание</h3>
+      <p>Плита и средняя колонна: сила и моменты, с поперечной арматурой и без. План с расчётным контуром.</p>
+      <div class="meta"><span>СП 63.13330.2018, 8.1.46–8.1.52</span><span class="tag">Бесплатно, с отчётом</span></div>
+    </a>
+  </div>
+
+  <div class="sect-title">Арматура</div>
+  <div class="catalog">
+    <a class="tile" href="ankerovka.html">
+      <h3>Анкеровка и нахлёст</h3>
+      <p>Базовая длина анкеровки, длина анкеровки и нахлёста растянутых и сжатых стержней в мм и в диаметрах.</p>
+      <div class="meta"><span>СП 63.13330.2018, 10.3</span><span class="tag">Бесплатно, с отчётом</span></div>
     </a>
   </div>
 
   <div class="sect-title">Справочник</div>
   <div class="catalog">
+    <a class="tile" href="primery.html">
+      <h3>Проверочные примеры</h3>
+      <p>Расчёты вручную по формулам норм рядом с результатами сайта и сравнение с примером из ЛИРА-САПР.</p>
+      <div class="meta"><span>Ручной счёт</span><span class="tag">Бесплатно</span></div>
+    </a>
+    <a class="tile" href="stati.html">
+      <h3>Статьи</h3>
+      <p>Разобранные примеры: проверка прогиба плиты по СП 20 и подбор арматуры балки по СП 63.</p>
+      <div class="meta"><span>Примеры с пояснениями</span><span class="tag">Бесплатно</span></div>
+    </a>
     <a class="tile" href="materialy.html">
       <h3>Материалы</h3>
-      <p>Расчётные сопротивления и модули упругости тяжёлого бетона B15–B60 и арматуры A240–A600.</p>
+      <p>Расчётные сопротивления, модули упругости и коэффициенты ползучести бетона B15–B60 и арматуры A240–A600.</p>
       <div class="meta"><span>СП 63.13330.2018, раздел 6</span><span class="tag">Бесплатно</span></div>
     </a>
   </div>
-
-  <div class="notes">
-    <div>Расчёты выполняются в браузере, введённые данные никуда не передаются. Результат не заменяет проверку расчёта инженером.</div>
-  </div>
 </main>
 
-<script src="app.js?v=5"></script>
+<footer class="foot"><div class="foot-in">Расчёты выполняются в браузере, введённые данные никуда не отправляются. Результаты не заменяют проверку расчёта инженером.</div></footer>
+<script src="docx.js?v=7"></script>
+<script src="pdf.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

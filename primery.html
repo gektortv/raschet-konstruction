@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверочные примеры: расчёты вручную и результаты сайта</title>
+<meta name="description" content="Проверочные примеры к онлайн-расчётам: сбор нагрузок, армирование и прогиб балки, предельный прогиб, продавливание, анкеровка. Ручной счёт по формулам и сравнение с ЛИРА-САПР.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css?v=7">
+</head>
+<body data-page="examples">
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="index.html">Расчёт ЖБК</a>
+    <nav class="nav" aria-label="Разделы">
+      <a href="index.html">Расчёты</a>
+      <a href="primery.html" class="on" aria-current="page">Проверочные примеры</a>
+      <a href="stati.html">Статьи</a>
+      <a href="materialy.html">Материалы</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="head">
+    <h1>Проверочные примеры</h1>
+    <div class="sub">Каждый пример посчитан вручную по формулам норм. Кнопка под примером открывает тот же расчёт на сайте — числа должны совпасть. Два примера сверены с опубликованными внешними расчётами.</div>
+  </div>
+  <nav class="toc" aria-label="Примеры">
+    <a href="#loads">1. Сбор нагрузок</a><a href="#reinf">2. Армирование балки</a><a href="#defl">3. Прогиб балки</a>
+    <a href="#limit">4. Предельный прогиб</a><a href="#punch">5. Продавливание</a><a href="#anchor">6. Анкеровка и нахлёст</a>
+  </nav>
+  <section class="ex" id="loads">
+    <h2 style="font-size:20px; font-weight:600">1. Сбор нагрузок на перекрытие жилого дома</h2>
+    <p style="color:var(--ink-2)">Плита 200 мм, стяжка 50 мм, звукоизоляция 20 мм, покрытие пола 0,15 кПа, перегородки 0,5 кПа, квартиры — 1,5 кПа. Грузовая полоса балки 6 м, ребро 300 × 400 мм.</p>
+    <div class="scroll"><table class="cmp"><thead><tr><th>Нагрузка</th><th>Нормативная, кПа</th><th>γf</th><th>Расчётная, кПа</th></tr></thead><tbody><tr><td>Плита 0,2 × 25</td><td>5,000</td><td>1,1</td><td>5,500</td></tr><tr><td>Стяжка 0,05 × 18</td><td>0,900</td><td>1,3</td><td>1,170</td></tr><tr><td>Звукоизоляция 0,02 × 1,5</td><td>0,030</td><td>1,3</td><td>0,039</td></tr><tr><td>Покрытие пола</td><td>0,150</td><td>1,2</td><td>0,180</td></tr><tr><td>Перегородки</td><td>0,500</td><td>1,3</td><td>0,650</td></tr><tr><td>Квартиры, табл. 8.3</td><td>1,500</td><td>1,3</td><td>1,950</td></tr><tr><td><b>Итого</b></td><td><b>8,080</b></td><td></td><td><b>9,489</b></td></tr></tbody></table></div>
+    <div class="formula">Для прогиба: 6,080 + 0,5 + 0,35·1,5 = 7,105 кПа
+Ребро: 0,3·0,4·25 = 3,000 кН/м
+На балку: q = 9,489·6 + 3,0·1,1 = 60,23 кН/м;  qn = 8,080·6 + 3,0 = 51,48 кН/м;  qn,l = 7,105·6 + 3,0 = 45,63 кН/м</div>
+    <p style="color:var(--ink-2)">Сайт: 9,49 / 8,08 / 7,11 кПа и 60,23 / 51,48 / 45,63 кН/м.</p>
+
+    <div class="actions"><a class="btn" href="sbor-nagruzok.html?data=%7B%22layers%22%3A%20%5B%7B%22name%22%3A%20%22%D0%9C%D0%BE%D0%BD%D0%BE%D0%BB%D0%B8%D1%82%D0%BD%D0%B0%D1%8F%20%D0%B6%D0%B5%D0%BB%D0%B5%D0%B7%D0%BE%D0%B1%D0%B5%D1%82%D0%BE%D0%BD%D0%BD%D0%B0%D1%8F%20%D0%BF%D0%BB%D0%B8%D1%82%D0%B0%22%2C%20%22t%22%3A%20%22200%22%2C%20%22w%22%3A%20%2225%22%2C%20%22direct%22%3A%20%22%22%2C%20%22gf%22%3A%20%221.1%22%7D%2C%20%7B%22name%22%3A%20%22%D0%A1%D1%82%D1%8F%D0%B6%D0%BA%D0%B0%20%D0%B8%D0%B7%20%D1%86%D0%B5%D0%BC%D0%B5%D0%BD%D1%82%D0%BD%D0%BE-%D0%BF%D0%B5%D1%81%D1%87%D0%B0%D0%BD%D0%BE%D0%B3%D0%BE%20%D1%80%D0%B0%D1%81%D1%82%D0%B2%D0%BE%D1%80%D0%B0%22%2C%20%22t%22%3A%20%2250%22%2C%20%22w%22%3A%20%2218%22%2C%20%22direct%22%3A%20%22%22%2C%20%22gf%22%3A%20%221.3%22%7D%2C%20%7B%22name%22%3A%20%22%D0%97%D0%B2%D1%83%D0%BA%D0%BE%D0%B8%D0%B7%D0%BE%D0%BB%D1%8F%D1%86%D0%B8%D1%8F%22%2C%20%22t%22%3A%20%2220%22%2C%20%22w%22%3A%20%221.5%22%2C%20%22direct%22%3A%20%22%22%2C%20%22gf%22%3A%20%221.3%22%7D%2C%20%7B%22name%22%3A%20%22%D0%9F%D0%BE%D0%BA%D1%80%D1%8B%D1%82%D0%B8%D0%B5%20%D0%BF%D0%BE%D0%BB%D0%B0%22%2C%20%22t%22%3A%20%22%22%2C%20%22w%22%3A%20%22%22%2C%20%22direct%22%3A%20%220.15%22%2C%20%22gf%22%3A%20%221.2%22%7D%5D%2C%20%22live%22%3A%20%22flat%22%2C%20%22liveVal%22%3A%20%221.5%22%2C%20%22part%22%3A%20%220.5%22%2C%20%22partGf%22%3A%20%221.3%22%2C%20%22B%22%3A%20%226%22%2C%20%22bb%22%3A%20%22300%22%2C%20%22hr%22%3A%20%22400%22%2C%20%22bw%22%3A%20%2225%22%2C%20%22bgf%22%3A%20%221.1%22%7D">Открыть этот пример на сайте</a></div>
+  </section>
+  <section class="ex" id="reinf">
+    <h2 style="font-size:20px; font-weight:600">2. Армирование балки 300 × 600 мм</h2>
+    <p style="color:var(--ink-2)">Пролёт 6 м, расчётная нагрузка 50 кН/м, бетон B25 (Rb = 14,5 МПа, Rbt = 1,05 МПа), арматура A500 (Rs = 435 МПа), a = 50 мм.</p>
+    <div class="formula">M = 50·6² / 8 = 225,0 кН·м;  Q = 50·6 / 2 = 150,0 кН;  h₀ = 600 − 50 = 550 мм
+ξR = 0,8 / (1 + 435 / (2·10⁵·0,0035)) = 0,493;  αR = 0,493·(1 − 0,5·0,493) = 0,372
+αm = 225·10⁶ / (14,5·300·550²) = 0,1710 ≤ αR
+ξ = 1 − √(1 − 2·0,1710) = 0,1888
+As = 14,5·300·0,1888·550 / 435 = 1038 мм²  →  3Ø22, As = 1140 мм²
+Расстояние в свету: (300 − 2·50) / 2 − 22 = 78 мм ≥ 25 мм;  μs = 1140 / (300·550) = 0,69 % ≥ 0,1 %</div>
+    <div class="formula">Наклонные сечения: 0,3·Rb·b·h₀ = 0,3·14,5·300·550 = 717,8 кН ≥ 150 кН
+c = 2h₀ = 1100 мм: Qb = 1,5·1,05·300·550² / 1100 = 129,9 кН ≥ Q = 150 − 50·1,1 = 95,0 кН
+c = 3h₀ = 1650 мм: Qb = 86,6 кН ≥ Q = 150 − 50·1,65 = 67,5 кН  →  по расчёту хомуты не требуются, шаг — конструктивный</div>
+    <p style="color:var(--ink-2)">Сайт: As = 1038 мм², принято 3Ø22; бетон воспринимает поперечную силу без хомутов, наибольший шаг хомутов у опоры 250 мм (не более 0,5h₀ = 275 мм и 300 мм).</p>
+
+    <div class="actions"><a class="btn" href="armirovanie-balki.html?shape=rect&b=300&h=600&a=50&rows=auto&L=6&loadType=q&q=50&concrete=B25&steel=A500&gb1=1.0&swClass=A400&dsw=8&nsw=2&sw=150">Открыть этот пример на сайте</a></div>
+  </section>
+  <section class="ex" id="defl">
+    <h2 style="font-size:20px; font-weight:600">3. Прогиб балки по понижающему коэффициенту</h2>
+    <p style="color:var(--ink-2)">Та же балка, нормативные нагрузки: постоянная 31,5 кН/м, полезная 10 кН/м. Eb = 30 000 МПа для B25, k = 0,2.</p>
+    <div class="formula">Нагрузка для прогиба: 31,5 + 0,35·10 = 35,0 кН/м;  M = 35·6² / 8 = 157,5 кН·м
+I = 300·600³ / 12 = 540 000 см⁴;  D = 0,2·30 000·540 000·10⁴ = 32 400 кН·м²
+f = 5/48·157,5·6² / 32 400 = 0,0182 м = 18,2 мм ≤ fu = 6000 / 200 = 30,0 мм</div>
+    <p style="color:var(--ink-2)">Сайт: 18,2 мм при предельном 30,0 мм.</p>
+
+    <div class="actions"><a class="btn" href="progib-balki.html?shape=rect&b=300&h=600&L=6&loadType=q&g=31.5&p=10&s=0&limit=low&interp=mm&method=coef&kred=0.2&concrete=B25">Открыть этот пример на сайте</a></div>
+  </section>
+  <section class="ex" id="limit">
+    <h2 style="font-size:20px; font-weight:600">4. Предельный прогиб при пролёте 9,47 м</h2>
+    <p style="color:var(--ink-2)">Помещения высотой до 6 м. По табл. Д.1 СП 20.13330.2016: 6 м — l/200 = 30 мм, 12 м — l/250 = 48 мм.</p>
+    <div class="formula">Интерполяция прогибов:     fu = 30 + (48 − 30)·(9,47 − 6) / 6 = 40,41 мм  (l/234)
+Интерполяция знаменателей: n = 200 + 50·3,47 / 6 = 228,9;  fu = 9470 / 228,9 = 41,37 мм</div>
+    <p style="color:var(--ink-2)">Сайт: 40,4 мм или 41,4 мм в зависимости от выбранного способа интерполяции.</p>
+
+    <div class="actions"><a class="btn" href="proverka-progiba.html?f=37.68&L=9.47&elem=span&limit=low&interp=mm&nLim=200">Открыть этот пример на сайте</a></div>
+  </section>
+  <section class="ex" id="punch">
+    <h2 style="font-size:20px; font-weight:600">5. Продавливание: сравнение с примером ЛИРА-САПР</h2>
+    <p style="color:var(--ink-2)">Исходные данные взяты из опубликованного примера расчёта на продавливание в ЛИРА-САПР: плита 200 мм, h₀ = 170 мм, колонна 200 × 200 мм, Rbt = 1,05 МПа, сила 8,074 тс, моменты в колонне 1,187 и 0,749 тс·м.</p>
+    <div class="formula">u = 4·(200 + 170) = 1480 мм;  Fb,ult = 1,05·1480·170 = 264,2 кН
+Wb = 370·370 + 370² / 3 = 182 533 мм²;  Mb,ult = 1,05·182 533·170 = 32,58 кН·м
+F / Fb,ult = 79,18 / 264,2 = 0,300;  Σ0,5Mloc / Mb,ult = (5,82 + 3,67) / 32,58 = 0,291 > 0,5·0,300
+Коэффициент использования: 0,300 + 0,150 = 0,450</div>
+    <div class="scroll"><table class="cmp"><thead><tr><th>Величина</th><th>ЛИРА-САПР</th><th>Ручной счёт</th><th>Сайт</th></tr></thead><tbody><tr><td>Fb,ult</td><td>26,939 тс</td><td>264,2 кН = 26,94 тс</td><td>264,2 кН</td></tr><tr><td>Mb,ult</td><td>3,322 тс·м</td><td>32,58 кН·м = 3,322 тс·м</td><td>32,6 кН·м</td></tr><tr><td>Коэффициент использования</td><td>0,45</td><td>0,450</td><td>0,450</td></tr></tbody></table></div>
+    <p style="color:var(--ink-2)">Источник: <a href="https://lira-soft.com/download/files/primer-prodavlivanie-26-02-2021.pdf">пример расчёта на продавливание, ЛИРА-САПР</a>.</p>
+
+    <div class="actions"><a class="btn" href="prodavlivanie.html?h=200&ax=30&colA=200&colB=200&F=79.18&Ma=11.64&Mb=7.35&concrete=B25&gb1=1.0&useSw=">Открыть этот пример на сайте</a></div>
+  </section>
+  <section class="ex" id="anchor">
+    <h2 style="font-size:20px; font-weight:600">6. Анкеровка и нахлёст A500 Ø16 в бетоне B30</h2>
+    <div class="formula">Rbond = 2,5·1,0·1,15 = 2,875 МПа;  l0,an = 435·16 / (4·2,875) = 605,2 мм = 37,8d
+lan = 1,0·605,2 = 605 мм ≥ 15d = 240 мм  →  610 мм
+Нахлёст, не более 50 % стержней в сечении: ll = 1,2·605,2 = 726 мм = 45,4d  →  730 мм
+Нахлёст, более 50 %: ll = 2,0·605,2 = 1210 мм = 75,7d  →  1220 мм</div>
+    <p style="color:var(--ink-2)">Опубликованные значения для A500С и B30: нахлёст не менее 46d при стыковке не более 50 % стержней и 76d при стыковке всех (<a href="https://fordewind.org/wiki/doku.php?id=%D0%B0%D0%BD%D0%BA%D0%B5%D1%80%D0%BE%D0%B2%D0%BA%D0%B0">Wiki ЖБК</a>). Сайт: 730 мм (45,6d) и 1220 мм (76,3d), длины округлены вверх до 10 мм.</p>
+
+    <div class="actions"><a class="btn" href="ankerovka.html?steel=A500&d=16&concrete=B30&gb1=1.0&state=tens&ratio=1&share=50">Открыть этот пример на сайте</a></div>
+  </section>
+</main>
+
+<footer class="foot"><div class="foot-in">Расчёты выполняются в браузере, введённые данные никуда не отправляются. Результаты не заменяют проверку расчёта инженером.</div></footer>
+<script src="docx.js?v=7"></script>
+<script src="pdf.js?v=7"></script>
+<script src="app.js?v=7"></script>
+</body>
+</html>

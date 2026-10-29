@@ -187,3 +187,44 @@ button.btn { border: 0; cursor: pointer; font-family: var(--sans); }
   .paper figure, .paper tr { break-inside: avoid; }
   .paper h2, .paper h3, .paper h4 { break-after: avoid; }
 }
+
+/* Подвал */
+.foot { border-top: 1px solid var(--line); background: var(--card); margin-top: 16px; }
+.foot-in { max-width: 1240px; margin: 0 auto; padding: 18px 16px; font-size: 13px; color: var(--muted); }
+
+/* Сбор нагрузок */
+.wide-form { flex: 1.4 1 380px; }
+.layer { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--ground); align-items: end; }
+.layer .wide { grid-column: span 3; }
+.layer .fld:nth-child(5) { grid-column: span 2; }
+.layer .fld input, .layer .fld select { background: #FFFFFF; }
+.layer .fld label { min-height: 2.6em; display: flex; align-items: flex-end; }
+.layer .wide label { min-height: 0; }
+
+/* Ввод из Excel */
+textarea { width: 100%; min-height: 110px; border: 1px solid var(--field); border-radius: 6px; padding: 10px 12px; font-family: var(--mono); font-size: 14px; color: var(--ink); background: #FFFFFF; resize: vertical; }
+textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+details.paste { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; background: var(--ground); }
+details.paste summary { cursor: pointer; font-weight: 500; min-height: 32px; display: flex; align-items: center; }
+a.btn-sec { text-decoration: none; }
+
+/* Лист отчёта: дополнения */
+.paper p.meta { text-align: left; }
+.paper p.c { text-align: center; }
+.paper table.kv td:first-child { width: 60%; }
+.paper table.kv td { vertical-align: top; }
+
+/* Статьи и примеры */
+.prose { max-width: 820px; display: flex; flex-direction: column; gap: 14px; font-size: 16px; line-height: 1.6; }
+.prose h2 { font-size: 22px; font-weight: 600; margin-top: 12px; }
+.prose h3 { font-size: 18px; font-weight: 600; margin-top: 6px; }
+.prose p, .prose li { color: var(--ink-2); }
+.prose ul, .prose ol { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; overflow-x: auto; white-space: pre-wrap; color: var(--ink); }
+.cmp { border-collapse: collapse; width: 100%; font-size: 14px; }
+.cmp th, .cmp td { white-space: normal; }
+.ex { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.ex .actions { margin-top: 4px; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 15px; }
+@media print { .foot { display: none; } }
+.fld input[type="text"] { font-family: var(--sans); }

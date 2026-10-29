@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Расчёт плиты на продавливание онлайн по СП 63.13330.2018</title>
+<meta name="description" content="Продавливание плиты перекрытия средней колонной по СП 63.13330.2018: с поперечной арматурой и без, с учётом моментов, с отчётом.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css?v=7">
+</head>
+<body data-page="punch">
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="index.html">Расчёт ЖБК</a>
+    <nav class="nav" aria-label="Разделы">
+      <a href="index.html" class="on" aria-current="page">Расчёты</a>
+      <a href="primery.html">Проверочные примеры</a>
+      <a href="stati.html">Статьи</a>
+      <a href="materialy.html">Материалы</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="head">
+    <h1>Продавливание плиты</h1>
+    <div class="sub">Средняя колонна прямоугольного сечения · сосредоточенная сила и моменты · с поперечной арматурой и без · СП 63.13330.2018, пп. 8.1.46–8.1.52</div>
+  </div>
+
+  <div class="layout">
+    <form class="card form" id="form" aria-label="Исходные данные" onsubmit="return false">
+      <h2>Исходные данные</h2>
+      <div class="grp">Плита и колонна</div>
+      <div class="two">
+        <div class="fld"><label for="h">Толщина плиты h, мм</label><input id="h" type="number" inputmode="decimal" min="0" value="220"></div>
+        <div class="fld"><label for="ax">До центра арматуры a, мм</label><input id="ax" type="number" inputmode="decimal" min="0" value="35"></div>
+      </div>
+      <div class="hint">a — среднее расстояние до центров растянутой арматуры двух направлений.</div>
+      <div class="two">
+        <div class="fld"><label for="colA">Сторона колонны a, мм</label><input id="colA" type="number" inputmode="decimal" min="0" value="400"></div>
+        <div class="fld"><label for="colB">Сторона колонны b, мм</label><input id="colB" type="number" inputmode="decimal" min="0" value="400"></div>
+      </div>
+
+      <div class="grp sep">Нагрузки</div>
+      <div class="fld"><label for="F">Сосредоточенная сила F, кН</label><input id="F" type="number" inputmode="decimal" min="0" step="1" value="400"></div>
+      <div class="two">
+        <div class="fld"><label for="Ma">Момент Mloc в плоскости стороны a, кН·м</label><input id="Ma" type="number" inputmode="decimal" step="0.1" value="0"></div>
+        <div class="fld"><label for="Mb">Момент Mloc в плоскости стороны b, кН·м</label><input id="Mb" type="number" inputmode="decimal" step="0.1" value="0"></div>
+      </div>
+      <div class="hint">F — сила от колонны за вычетом нагрузки внутри контура продавливания. В расчёте учитывается половина сосредоточенных моментов (п. 8.1.46).</div>
+
+      <div class="grp sep">Бетон</div>
+      <div class="two">
+        <div class="fld"><label for="concrete">Класс бетона</label><select id="concrete"><option value="B15">B15</option><option value="B20">B20</option><option value="B25" selected>B25</option><option value="B30">B30</option><option value="B35">B35</option><option value="B40">B40</option><option value="B45">B45</option><option value="B50">B50</option><option value="B55">B55</option><option value="B60">B60</option></select></div>
+        <div class="fld"><label for="gb1">γb1</label><select id="gb1"><option value="1.0" selected>1,0</option><option value="0.9">0,9</option></select></div>
+      </div>
+
+      <div class="grp sep">Поперечная арматура</div>
+      <label class="chk"><input type="checkbox" id="useSw" value="1"> Учитывать поперечную арматуру</label>
+      <div class="stack" id="grp-psw" hidden>
+        <div class="two">
+          <div class="fld"><label for="pswClass">Класс</label><select id="pswClass"><option value="A240" selected>A240</option><option value="A400">A400</option><option value="A500">A500</option></select></div>
+          <div class="fld"><label for="pdsw">Диаметр, мм</label><select id="pdsw"><option value="6">6</option><option value="8" selected>8</option><option value="10">10</option><option value="12">12</option><option value="14">14</option></select></div>
+        </div>
+        <div class="two">
+          <div class="fld"><label for="pk">Стержней в полосе ±0,5h₀ на одном шаге</label><input id="pk" type="number" inputmode="numeric" min="1" step="1" value="2"></div>
+          <div class="fld"><label for="psw">Шаг вдоль контура sw, мм</label><input id="psw" type="number" inputmode="numeric" min="10" step="5" value="60"></div>
+        </div>
+        <div class="hint">qsw = Rsw·Asw / sw, где Asw — площадь стержней, попадающих в полосу шириной h₀ вокруг расчётного контура на одном шаге sw вдоль контура. Шаг стержней в направлении от колонны — не более h₀/3.</div>
+      </div>
+    </form>
+
+    <div class="col">
+      <div class="row">
+        <section class="card f1" aria-label="План">
+          <h2>План, мм</h2>
+          <div id="out-plan"></div>
+        </section>
+        <section class="card f13" aria-label="Результат">
+          <h2>Результат</h2>
+          <div class="stack" style="gap: 18px" id="out-result"></div>
+        </section>
+      </div>
+      <section class="card" aria-label="Отчёт и ссылка на расчёт">
+        <h2>Отчёт</h2>
+        <div class="two">
+          <div class="fld"><label for="rep-object">Объект</label><input id="rep-object" type="text" placeholder="Название и адрес объекта"></div>
+          <div class="fld"><label for="rep-author">Выполнил</label><input id="rep-author" type="text" placeholder="Фамилия И. О."></div>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn" id="rep-docx">Скачать Word</button>
+          <button type="button" class="btn" id="rep-pdf">Скачать PDF</button>
+          <button type="button" class="btn-sec" id="rep-print">Печать</button>
+        </div>
+        <div class="hint" id="rep-msg" role="status"></div>
+        <div class="actions">
+          <button type="button" class="btn-sec" id="share">Скопировать ссылку на расчёт</button>
+          <button type="button" class="btn-sec" id="reset">Сбросить данные</button>
+        </div>
+        <div class="hint" id="share-msg" role="status"></div>
+        <div class="hint">Введённые данные сохраняются в этом браузере и восстанавливаются при следующем открытии страницы.</div>
+      </section>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div>Условие прочности: F/Fult + min(ΣM/Mult; 0,5·F/Fult) ≤ 1, Fb,ult = Rbt·u·h₀, Mb,ult = Rbt·Wb·h₀, где u и Wb — периметр и момент сопротивления расчётного контура на расстоянии 0,5h₀ от граней колонны. С поперечной арматурой: Fsw,ult = 0,8·qsw·u учитывается при Fsw,ult ≥ 0,25·Fb,ult, а сумма — не более 2Fb,ult.</div>
+    <div>Границы применимости: средняя колонна, без отверстий у колонны, контур не пересекает края плиты. Прочность за пределами зоны поперечной арматуры здесь не проверяется. Результат не заменяет проверку расчёта инженером.</div>
+  </div>
+</main>
+<div class="paper" id="rep-preview" hidden></div>
+
+<footer class="foot"><div class="foot-in">Расчёты выполняются в браузере, введённые данные никуда не отправляются. Результаты не заменяют проверку расчёта инженером.</div></footer>
+<script src="docx.js?v=7"></script>
+<script src="pdf.js?v=7"></script>
+<script src="app.js?v=7"></script>
+<script src="calc2.js?v=7"></script>
+</body>
+</html>

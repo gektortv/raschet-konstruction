@@ -462,7 +462,135 @@ function tablesHtml(concSel, steelSel) {
 /* =====================================================================
    Работа с формой
    ===================================================================== */
-function readForm(ids) { var s = {}; ids.forEach(function (id) { s[id] = $(id).value; }); return s; }
+function getVal(id) { var el = $(id); return el.type === 'checkbox' ? (el.checked ? '1' : '') : el.value; }
+function setVal(id, v) {
+  var el = $(id);
+  if (!el) return;
+  if (el.type === 'checkbox') el.checked = v === true || v === '1' || v === 'true';
+  else el.value = v;
+}
+function readForm(ids) { var s = {}; ids.forEach(function (id) { s[id] = getVal(id); }); return s; }
+
+/* ---------- Сохранение в браузере и ссылка на расчёт ---------- */
+function storeGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+function storeSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* хранилище недоступно */ } }
+function storeDel(k) { try { localStorage.removeItem(k); } catch (e) { /* хранилище недоступно */ } }
+
+// Данные берутся из адреса страницы, а если их там нет — из сохранённых в браузере.
+// Возвращает {fromUrl, params}. Каждое изменение формы сохраняется.
+function initState(key, ids) {
+  var params = new URLSearchParams(location.search), fromUrl = false;
+  ids.forEach(function (id) { if (params.has(id)) { setVal(id, params.get(id)); fromUrl = true; } });
+  if (!fromUrl) {
+    var saved = storeGet('calc:' + key);
+    if (saved) ids.forEach(function (id) { if (Object.prototype.hasOwnProperty.call(saved, id)) setVal(id, saved[id]); });
+  }
+  $('form').addEventListener('input', function () { storeSet('calc:' + key, readForm(ids)); });
+  if (fromUrl) storeSet('calc:' + key, readForm(ids));
+  return { fromUrl: fromUrl, params: params };
+}
+
+function pageUrl() { return location.href.split('?')[0].split('#')[0]; }
+
+// Кнопки «Ссылка на расчёт» и «Сбросить данные»
+function setupShare(key, ids) {
+  if ($('share')) {
+    $('share').addEventListener('click', function () {
+      var link = pageUrl() + '?' + ids.map(function (id) { return id + '=' + encodeURIComponent(getVal(id)); }).join('&');
+      var done = function (ok) {
+        $('share-msg').textContent = ok ? 'Ссылка скопирована. По ней откроется этот же расчёт.' : 'Скопируйте ссылку: ' + link;
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(function () { done(true); }, function () { done(false); });
+      else done(false);
+    });
+  }
+  if ($('reset')) {
+    $('reset').addEventListener('click', function () {
+      storeDel('calc:' + key);
+      location.href = pageUrl();
+    });
+  }
+}
+
+/* ---------- Отчёт: общие кнопки, реквизиты, печать ---------- */
+function reportMeta() {
+  return [['Объект', $('rep-object').value.trim()], ['Выполнил', $('rep-author').value.trim()], ['Дата', new Date().toLocaleDateString('ru-RU')]];
+}
+function setupMeta() {
+  var meta = storeGet('rep-meta') || {};
+  if (!$('rep-object')) return;
+  if (!$('rep-object').value) $('rep-object').value = meta.object || '';
+  if (!$('rep-author').value) $('rep-author').value = meta.author || '';
+  ['rep-object', 'rep-author'].forEach(function (id) {
+    $(id).addEventListener('input', function () { storeSet('rep-meta', { object: $('rep-object').value, author: $('rep-author').value }); });
+  });
+}
+// build() возвращает модель отчёта или Promise с ней; null — отчёт собрать нельзя
+function setupReport(build, fileName) {
+  setupMeta();
+  var msg = function (t) { if ($('rep-msg')) $('rep-msg').textContent = t || ''; };
+  var make = function () {
+    return Promise.resolve().then(build).then(function (m) {
+      if (!m) msg('Отчёт будет доступен, когда расчёт выполнен без ошибок во входных данных.');
+      else msg('');
+      return m;
+    });
+  };
+  $('rep-docx').addEventListener('click', function () {
+    var b = this; b.disabled = true;
+    make().then(function (m) { if (m) Doc.download(m, fileName()); }).catch(function () { msg('Не удалось собрать отчёт.'); })
+      .then(function () { b.disabled = false; });
+  });
+  if ($('rep-pdf')) $('rep-pdf').addEventListener('click', function () {
+    var b = this; b.disabled = true; msg('Готовлю PDF…');
+    make().then(function (m) { if (m) return Pdf.download(m, fileName()).then(function () { msg(''); }); })
+      .catch(function () { msg('Не удалось собрать PDF. Если сайт открыт из файла на компьютере, откройте его по ссылке в интернете или воспользуйтесь кнопкой «Печать».'); })
+      .then(function () { b.disabled = false; });
+  });
+  $('rep-print').addEventListener('click', function () {
+    make().then(function (m) {
+      if (!m) return;
+      var p = $('rep-preview');
+      p.innerHTML = Doc.previewHtml(m);
+      p.hidden = false;
+      var imgs = Array.prototype.slice.call(p.querySelectorAll('img'));
+      Promise.all(imgs.map(function (im) { return im.complete ? 0 : new Promise(function (r) { im.onload = im.onerror = r; }); }))
+        .then(function () { window.print(); });
+    });
+  });
+  window.addEventListener('afterprint', function () { if ($('rep-preview') && $('rep-print')) $('rep-preview').hidden = true; });
+}
+
+// Картинка для отчёта из SVG-элемента или строки SVG
+function svgFrom(str) { var t = document.createElement('div'); t.innerHTML = str; return t.querySelector('svg'); }
+function reportImg(svg, w, h, caption) {
+  return Doc.svgImage(svg, w, h).then(function (img) { return { kind: 'img', img: img, caption: caption }; });
+}
+
+// Схема балки для отчёта
+function schemeSvg(isQ, loadTxt, L) {
+  var W = 600, x0 = 30, x1 = 570, yb = 70;
+  var o = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' 120" width="' + W + '" height="120">';
+  o += '<text x="300" y="16" text-anchor="middle" fill="#15202B">' + loadTxt + '</text>';
+  if (isQ) {
+    o += '<rect x="' + x0 + '" y="30" width="' + (x1 - x0) + '" height="34" fill="none" stroke="#15202B" stroke-width="1.5"/>';
+    for (var x = x0 + 18; x < x1; x += 18) o += '<line x1="' + x + '" y1="30" x2="' + x + '" y2="64" stroke="#15202B"/>';
+  } else {
+    o += '<line x1="300" y1="26" x2="300" y2="62" stroke="#15202B" stroke-width="2"/><polygon points="293,58 307,58 300,68" fill="#15202B"/>';
+  }
+  o += '<rect x="' + x0 + '" y="' + yb + '" width="' + (x1 - x0) + '" height="6" fill="#15202B"/>';
+  o += '<polygon points="' + x0 + ',' + (yb + 6) + ' ' + (x0 - 9) + ',' + (yb + 20) + ' ' + (x0 + 9) + ',' + (yb + 20) + '" fill="#15202B"/>';
+  o += '<polygon points="' + x1 + ',' + (yb + 6) + ' ' + (x1 - 9) + ',' + (yb + 20) + ' ' + (x1 + 9) + ',' + (yb + 20) + '" fill="#15202B"/>';
+  o += '<text x="300" y="112" text-anchor="middle" fill="#15202B">L = ' + fmt(L, 2) + ' м</text></svg>';
+  return o;
+}
+// Эпюра для отчёта: та же форма, что на странице, с подписью наибольшего значения
+function diagramSvg(fn, axis, label) {
+  var s = svgFrom(diagram(fn, 90, axis, ''));
+  s.setAttribute('viewBox', '-10 -14 620 128');
+  s.insertAdjacentHTML('beforeend', '<text x="600" y="-2" text-anchor="end" fill="#15202B">' + label + '</text>');
+  return s;
+}
 
 // Пустое поле не подсвечивается: человек ещё не ввёл значение
 function markBad(ids, bad) {
@@ -482,11 +610,83 @@ function shapeFields(g) {
 }
 
 /* =====================================================================
+   Поперечная арматура (хомуты): прочность по наклонным сечениям, СП 63.13330.2018, 8.1.31–8.1.35
+   ===================================================================== */
+var RSW = { A240: 170, A400: 280, A500: 300 };          // Rsw, МПа (табл. 6.15)
+var SW_STEPS = [50, 60, 75, 80, 100, 120, 125, 150, 175, 200, 225, 250, 300];
+
+function shear(s, m) {
+  var g = m.g, bad = {};
+  var dsw = num(s.dsw), n = num(s.nsw), sw = num(s.sw), Rsw = RSW[s.swClass] || 280;
+  if (!(n >= 1) || n !== Math.floor(n)) bad.nsw = 1;
+  if (!(sw > 0)) bad.sw = 1;
+  var out = { bad: bad, ok: false };
+  if (!m.inputOk || bad.nsw || bad.sw) return out;
+  var b = g.b, h0 = m.st ? m.st.h0 : g.h - g.a1;
+  var Rbt = m.conc[2] * num(s.gb1), Rb = m.Rb;
+  var Q0 = m.Qmax * 1000, q = m.sc.isQ ? m.q : 0;         // Н и Н/мм
+  var cMax = 3 * h0;
+  if (!m.sc.isQ) cMax = Math.min(cMax, m.sc.Lmm / 2);
+  var Qstrip = 0.3 * Rb * b * h0;
+  var qswMin = 0.25 * Rbt * b;
+  var swMax = Rbt * b * h0 * h0 / Q0;
+  var swConstr = Math.min(0.5 * h0, 300);
+
+  var calc = function (spacing) {
+    var Asw = n * Math.PI * dsw * dsw / 4, qsw = Rsw * Asw / spacing, counted = qsw >= qswMin;
+    var worst = null, worst0 = null;
+    for (var i = 0; i <= 200; i++) {
+      var c = h0 + (cMax - h0) * i / 200;
+      if (c < h0) c = h0;
+      var Qb = Math.min(Math.max(1.5 * Rbt * b * h0 * h0 / c, 0.5 * Rbt * b * h0), 2.5 * Rbt * b * h0);
+      var c0 = Math.min(c, 2 * h0);
+      var Qsw = counted ? 0.75 * qsw * c0 : 0;
+      var Q = Q0 - q * c;
+      var u = Q / (Qb + Qsw), u0 = Q / Qb;
+      if (!worst || u > worst.u) worst = { c: c, Qb: Qb, Qsw: Qsw, Q: Q, u: u, c0: c0 };
+      if (!worst0 || u0 > worst0.u) worst0 = { c: c, Qb: Qb, Q: Q, u: u0 };
+    }
+    return { Asw: Asw, qsw: qsw, counted: counted, worst: worst, worst0: worst0 };
+  };
+  var r = calc(sw);
+  var passStrip = Q0 <= Qstrip;
+  var passStr = r.worst.u <= 1;
+  var checks = [
+    { name: 'Прочность бетонной полосы между наклонными трещинами, п. 8.1.32', pass: passStrip,
+      detail: 'Q = ' + fmt(Q0 / 1000, 1) + ' кН ≤ 0,3·Rb·b·h₀ = ' + fmt(Qstrip / 1000, 1) + ' кН' },
+    { name: 'Прочность по наклонному сечению, п. 8.1.33', pass: passStr,
+      detail: 'Q = ' + fmt(r.worst.Q / 1000, 1) + ' кН ≤ Qb + Qsw = ' + fmt(r.worst.Qb / 1000, 1) + ' + ' + fmt(r.worst.Qsw / 1000, 1) +
+        ' = ' + fmt((r.worst.Qb + r.worst.Qsw) / 1000, 1) + ' кН при c = ' + fmt(r.worst.c, 0) + ' мм' },
+    { name: 'Хомуты учитываются в расчёте: qsw ≥ 0,25·Rbt·b', pass: r.counted || r.worst0.u <= 1,
+      detail: 'qsw = ' + fmt(r.qsw, 1) + ' Н/мм ' + (r.counted ? '≥' : '<') + ' ' + fmt(qswMin, 1) + ' Н/мм' + (r.counted ? '' : (r.worst0.u <= 1 ? ', но по расчёту хомуты не требуются' : '')) },
+    { name: 'Шаг не больше sw,max = Rbt·b·h₀² / Q, п. 8.1.35', pass: sw <= swMax,
+      detail: fmt(sw, 0) + ' мм ≤ ' + fmt(swMax, 0) + ' мм' },
+    { name: 'Конструктивный шаг у опор: не более 0,5h₀ и 300 мм, п. 10.3.13', pass: sw <= swConstr + 1e-9,
+      detail: fmt(sw, 0) + ' мм ≤ ' + fmt(swConstr, 0) + ' мм' }
+  ];
+  // Наибольший подходящий шаг из распространённых
+  var best = null;
+  SW_STEPS.forEach(function (st) {
+    if (st > swMax || st > swConstr + 1e-9) return;
+    var t = calc(st);
+    if (t.worst.u <= 1 && (t.counted || t.worst0.u <= 1)) best = st;
+  });
+  out = { bad: bad, ok: true, b: b, h0: h0, Rbt: Rbt, Rb: Rb, Rsw: Rsw, dsw: dsw, n: n, sw: sw, Q0: Q0, q: q,
+          Qstrip: Qstrip, qswMin: qswMin, swMax: swMax, swConstr: swConstr, r: r, checks: checks,
+          pass: checks.every(function (c) { return c.pass; }), best: best, noNeed: r.worst0.u <= 1,
+          swMid: Math.min(0.75 * h0, 500) };
+  return out;
+}
+
+/* =====================================================================
    Страница «Армирование балки»
    ===================================================================== */
 function initReinf() {
-  var IDS = ['shape', 'b', 'h', 'bfc', 'hfc', 'bft', 'hft', 'a', 'rows', 'L', 'loadType', 'q', 'concrete', 'steel', 'gb1'];
-  var pick = 0;
+  var IDS = ['shape', 'b', 'h', 'bfc', 'hfc', 'bft', 'hft', 'a', 'rows', 'L', 'loadType', 'q', 'concrete', 'steel', 'gb1',
+             'swClass', 'dsw', 'nsw', 'sw'];
+  var pick = 0, last = null;
+  initState('reinf', IDS);
+  setupShare('reinf', IDS);
 
   function resultHtml(m) {
     if (!m.inputOk) {
@@ -551,17 +751,45 @@ function initReinf() {
       '<a class="btn" href="progib-balki.html?' + p.join('&') + '">Перейти к прогибу</a></div>';
   }
 
+  function shearHtml(m, t) {
+    if (!t.ok) return '<div class="wait">Расчёт хомутов появится, когда заданы сечение, нагрузка, шаг и число ветвей.</div>';
+    var o = '<div class="big-row"><div class="big"><div class="cap">Хомуты у опоры</div><div class="val">Ø' + fmt(t.dsw, 0) + ' шаг ' + fmt(t.sw, 0) +
+      '</div><div class="cap">' + $('swClass').value + ', ветвей: ' + fmt(t.n, 0) + ', Asw = ' + fmt(t.r.Asw, 0) + ' мм²</div></div>' +
+      '<div class="big"><div class="cap">Наибольший подходящий шаг</div><div class="val">' + (t.best ? t.best + ' мм' : '—') + '</div>' +
+      '<div class="cap">' + (t.best ? 'из ряда 50…300 мм при том же диаметре' : 'увеличьте диаметр или число ветвей') + '</div></div></div>';
+    if (t.noNeed) o += '<div style="color:var(--ink-2)">По расчёту бетон воспринимает поперечную силу без хомутов (Q ≤ Qb). Хомуты ставятся по конструктивным требованиям.</div>';
+    o += rowsBox([
+      ['Q у опоры', fmt(t.Q0 / 1000, 1) + ' кН'],
+      ['h₀', fmt(t.h0, 0) + ' мм'],
+      ['Rbt (с γb1)', fmt(t.Rbt, 3) + ' МПа'],
+      ['qsw = Rsw·Asw / sw', fmt(t.Rsw, 0) + '·' + fmt(t.r.Asw, 1) + ' / ' + fmt(t.sw, 0) + ' = ' + fmt(t.r.qsw, 1) + ' Н/мм'],
+      ['Опасное сечение c', fmt(t.r.worst.c, 0) + ' мм'],
+      ['Qb = 1,5·Rbt·b·h₀² / c', fmt(t.r.worst.Qb / 1000, 1) + ' кН'],
+      ['Qsw = 0,75·qsw·c₀, c₀ = ' + fmt(t.r.worst.c0, 0) + ' мм', fmt(t.r.worst.Qsw / 1000, 1) + ' кН'],
+      ['Шаг в средней части пролёта', 'не более ' + fmt(t.swMid, 0) + ' мм']
+    ]);
+    o += '<div class="stack" style="gap:10px"><div class="cap">Проверки</div>';
+    t.checks.forEach(function (c) { o += checkRow(c.name, c.pass, 'выполняется', 'не выполняется', c.detail); });
+    return o + '</div>';
+  }
+
   function render() {
     var s = readForm(IDS), m = strength(s, pick);
+    var t = shear(s, m);
+    last = { s: s, m: m, t: t };
     shapeFields(m.g);
     $('lbl-q').textContent = m.sc.isQ ? 'Расчётная нагрузка q, кН/м' : 'Расчётная сила P, кН';
-    markBad(IDS, m.bad);
+    var allBad = {}; Object.keys(m.bad).forEach(function (k) { allBad[k] = 1; }); Object.keys(t.bad).forEach(function (k) { allBad[k] = 1; });
+    markBad(IDS, allBad);
+    $('out-shear').innerHTML = shearHtml(m, t);
     $('mat-used').innerHTML = '<div><span>Rb = </span>' + fmt(m.Rb, 2) + ' МПа</div><div><span>Rs = </span>' + fmt(m.Rs, 0) + ' МПа</div>';
     $('out-section').innerHTML = drawSection(m.g, m.sel, m.steel[0]);
     $('out-result').innerHTML = resultHtml(m);
     $('out-diag').innerHTML = diagHtml(m);
     $('out-next').innerHTML = nextHtml(m, s);
   }
+
+  setupReport(function () { return reinfReport(last, reportMeta()); }, function () { return 'Армирование балки'; });
 
   $('form').addEventListener('input', function () { pick = 0; render(); });
   $('out-result').addEventListener('click', function (e) {
@@ -575,6 +803,100 @@ function initReinf() {
   render();
 }
 
+/* ---------- Отчёт «Армирование балки» ---------- */
+function shapeName(g) { return g.hasBot ? 'двутавровое' : (g.hasTop ? 'тавровое, полка в сжатой зоне' : 'прямоугольное'); }
+function sectionRows(g) {
+  var r = [['Сечение', shapeName(g)], [g.hasTop ? 'Ширина ребра b' : 'Ширина b', fmt(g.b, 0) + ' мм'], ['Высота h', fmt(g.h, 0) + ' мм']];
+  if (g.hasTop) r.push(['Сжатая полка b′f × h′f', fmt(g.bfc, 0) + ' × ' + fmt(g.hfc, 0) + ' мм']);
+  if (g.hasBot) r.push(['Растянутая полка bf × hf', fmt(g.bft, 0) + ' × ' + fmt(g.hft, 0) + ' мм']);
+  return r;
+}
+
+function reinfReport(last, meta) {
+  if (!last || !last.m.sel) return null;
+  var s = last.s, m = last.m, t = last.t, g = m.g, st = m.st, sel = m.sel, sc = m.sc;
+  var unitQ = sc.isQ ? ' кН/м' : ' кН';
+  var B = [];
+  B.push({ kind: 'h1', text: '1. Исходные данные' });
+  B.push({ kind: 'kv', rows: sectionRows(g).concat([
+    ['Расстояние до центра нижнего ряда арматуры a₁', fmt(g.a1, 0) + ' мм'],
+    ['Расчётная схема', 'однопролётная шарнирно опёртая балка'],
+    ['Пролёт L', fmt(sc.L, 2) + ' м'],
+    [sc.isQ ? 'Расчётная равномерная нагрузка q' : 'Расчётная сила P в середине пролёта', fmt(m.q, 2) + unitQ],
+    ['Бетон', 'тяжёлый ' + m.conc[0] + ', Rb = ' + fmt(m.conc[1], 1) + ' МПа, Rbt = ' + fmt(m.conc[2], 2) + ' МПа (табл. 6.8 СП 63.13330.2018)'],
+    ['Коэффициент γb1', fmt(num(s.gb1), 1)],
+    ['Продольная арматура', m.steel[0] + ', Rs = ' + fmt(m.Rs, 0) + ' МПа (табл. 6.14)'],
+    ['Хомуты', s.swClass + ', Rsw = ' + fmt(RSW[s.swClass], 0) + ' МПа']
+  ]) });
+
+  B.push({ kind: 'h1', text: '2. Усилия' });
+  B.push({ kind: 'p', text: sc.isQ
+    ? 'M = q·L² / 8 = ' + fmt(m.q, 2) + '·' + fmt(sc.L, 2) + '² / 8 = ' + fmt(m.M, 2) + ' кН·м; Q = q·L / 2 = ' + fmt(m.q, 2) + '·' + fmt(sc.L, 2) + ' / 2 = ' + fmt(m.Qmax, 2) + ' кН.'
+    : 'M = P·L / 4 = ' + fmt(m.q, 2) + '·' + fmt(sc.L, 2) + ' / 4 = ' + fmt(m.M, 2) + ' кН·м; Q = P / 2 = ' + fmt(m.Qmax, 2) + ' кН.' });
+
+  B.push({ kind: 'h1', text: '3. Подбор продольной арматуры' });
+  B.push({ kind: 'p', text: 'Расчёт по прочности нормального сечения по пп. 8.1.8–8.1.10 СП 63.13330.2018. Rb = ' + fmt(m.Rb, 2) + ' МПа с учётом γb1.' });
+  B.push({ kind: 'p', text: 'Рабочая высота: h₀ = h − a = ' + fmt(g.h, 0) + ' − ' + fmt(sel.ac, 1) + ' = ' + fmt(st.h0, 1) + ' мм' +
+    (sel.rows.length > 1 ? ', где a — расстояние до центра тяжести арматуры в ' + sel.rows.length + ' рядах.' : '.') });
+  var xiR = st.xiR;
+  B.push({ kind: 'p', text: 'Граничная высота сжатой зоны: ξR = 0,8 / (1 + Rs / (Es·εb2)) = 0,8 / (1 + ' + fmt(m.Rs, 0) + ' / (200000·0,0035)) = ' + fmt(xiR, 3) +
+    '; αR = ξR·(1 − 0,5ξR) = ' + fmt(st.aR, 3) + '.' });
+  var Mn = m.M * 1e6;
+  if (g.hasTop) {
+    var Mf = m.Rb * g.bfc * g.hfc * (st.h0 - 0.5 * g.hfc);
+    B.push({ kind: 'p', text: 'Момент, воспринимаемый полкой: Mf = Rb·b′f·h′f·(h₀ − 0,5h′f) = ' + fmt(m.Rb, 2) + '·' + fmt(g.bfc, 0) + '·' + fmt(g.hfc, 0) + '·(' +
+      fmt(st.h0, 1) + ' − 0,5·' + fmt(g.hfc, 0) + ') = ' + fmt(Mf / 1e6, 1) + ' кН·м ' + (st.inFlange ? '≥' : '<') + ' M = ' + fmt(m.M, 1) + ' кН·м — граница сжатой зоны ' +
+      (st.inFlange ? 'в полке, сечение рассчитывается как прямоугольное шириной b′f.' : 'в ребре.') });
+  }
+  if (g.hasTop && !st.inFlange) {
+    B.push({ kind: 'p', text: 'αm = (M − Rb·(b′f − b)·h′f·(h₀ − 0,5h′f)) / (Rb·b·h₀²) = ' + fmt(st.am, 4) + ' ≤ αR = ' + fmt(st.aR, 3) + '.' });
+    B.push({ kind: 'p', text: 'ξ = 1 − √(1 − 2αm) = ' + fmt(st.xi, 4) + '; As = (Rb·b·ξ·h₀ + Rb·(b′f − b)·h′f) / Rs = ' + fmt(st.asReq, 0) + ' мм².' });
+  } else {
+    var bw = g.hasTop ? g.bfc : g.b;
+    B.push({ kind: 'p', text: 'αm = M / (Rb·b·h₀²) = ' + fmt(m.M, 2) + '·10⁶ / (' + fmt(m.Rb, 2) + '·' + fmt(bw, 0) + '·' + fmt(st.h0, 1) + '²) = ' + fmt(st.am, 4) +
+      ' ≤ αR = ' + fmt(st.aR, 3) + '.' });
+    B.push({ kind: 'p', text: 'ξ = 1 − √(1 − 2αm) = ' + fmt(st.xi, 4) + '; As = Rb·b·ξ·h₀ / Rs = ' + fmt(m.Rb, 2) + '·' + fmt(bw, 0) + '·' + fmt(st.xi, 4) + '·' +
+      fmt(st.h0, 1) + ' / ' + fmt(m.Rs, 0) + ' = ' + fmt(st.asReq, 0) + ' мм².' });
+  }
+  B.push({ kind: 'p', text: 'Принята арматура ' + sel.label + ' ' + m.steel[0] + ', As = ' + fmt(sel.area, 0) + ' мм² ≥ ' + fmt(st.asReq, 0) + ' мм² (запас ' +
+    fmt((sel.area / st.asReq - 1) * 100, 1) + ' %).', bold: true });
+  m.checks.forEach(function (c) { B.push({ kind: 'check', text: c.name + ': ' + c.detail + ' — ' + (c.pass ? 'выполняется.' : 'не выполняется.'), pass: c.pass }); });
+
+  if (t.ok) {
+    B.push({ kind: 'h1', text: '4. Поперечная арматура' });
+    B.push({ kind: 'p', text: 'Расчёт по наклонным сечениям по пп. 8.1.31–8.1.35 СП 63.13330.2018 у опоры, Q = ' + fmt(t.Q0 / 1000, 1) + ' кН, h₀ = ' + fmt(t.h0, 1) +
+      ' мм, b = ' + fmt(t.b, 0) + ' мм, Rbt = ' + fmt(t.Rbt, 3) + ' МПа.' });
+    B.push({ kind: 'p', text: 'Хомуты ' + s.swClass + ' Ø' + fmt(t.dsw, 0) + ', ' + fmt(t.n, 0) + ' ветви, шаг ' + fmt(t.sw, 0) + ' мм: Asw = ' + fmt(t.r.Asw, 1) +
+      ' мм², qsw = Rsw·Asw / sw = ' + fmt(t.Rsw, 0) + '·' + fmt(t.r.Asw, 1) + ' / ' + fmt(t.sw, 0) + ' = ' + fmt(t.r.qsw, 1) + ' Н/мм.' });
+    B.push({ kind: 'p', text: 'Опасное наклонное сечение c = ' + fmt(t.r.worst.c, 0) + ' мм: Qb = 1,5·Rbt·b·h₀² / c = ' + fmt(t.r.worst.Qb / 1000, 1) +
+      ' кН (в пределах 0,5…2,5·Rbt·b·h₀); Qsw = 0,75·qsw·c₀ = ' + fmt(t.r.worst.Qsw / 1000, 1) + ' кН при c₀ = ' + fmt(t.r.worst.c0, 0) +
+      ' мм; поперечная сила в конце сечения Q = ' + fmt(t.r.worst.Q / 1000, 1) + ' кН.' });
+    if (t.noNeed) B.push({ kind: 'p', text: 'Бетон воспринимает поперечную силу без хомутов (Q ≤ Qb); хомуты назначаются по конструктивным требованиям.' });
+    t.checks.forEach(function (c) { B.push({ kind: 'check', text: c.name + ': ' + c.detail + ' — ' + (c.pass ? 'выполняется.' : 'не выполняется.'), pass: c.pass }); });
+    B.push({ kind: 'p', text: 'В средней части пролёта шаг хомутов — не более 0,75h₀ и 500 мм, то есть не более ' + fmt(t.swMid, 0) + ' мм (п. 10.3.13).' });
+  }
+
+  var allPass = m.checks.every(function (c) { return c.pass; }) && (!t.ok || t.pass);
+  B.push({ kind: 'h1', text: (t.ok ? '5' : '4') + '. Вывод' });
+  B.push({ kind: 'check', text: allPass ? 'Прочность балки по нормальным и наклонным сечениям обеспечена.' : 'Не все проверки выполняются — сечение или армирование нужно изменить.', pass: allPass });
+
+  // Рисунки: схема, эпюры, сечение
+  var sh = shapes(sc.isQ);
+  var jobs = [
+    reportImg(svgFrom(schemeSvg(sc.isQ, (sc.isQ ? 'q = ' : 'P = ') + fmt(m.q, 2) + unitQ, sc.L)), 600, 120, 'Расчётная схема'),
+    reportImg(diagramSvg(sh.m, 0, 'Mmax = ' + fmt(m.M, 1) + ' кН·м'), 620, 128, 'Эпюра изгибающих моментов M, кН·м'),
+    reportImg(diagramSvg(sh.q, 0.5, 'Qmax = ±' + fmt(m.Qmax, 1) + ' кН'), 620, 128, 'Эпюра поперечных сил Q, кН')
+  ];
+  var secSvg = $('out-section').querySelector('svg');
+  jobs.push(reportImg(secSvg, +secSvg.getAttribute('width'), +secSvg.getAttribute('height'), 'Поперечное сечение и продольная арматура, мм'));
+  return Promise.all(jobs).then(function (imgs) {
+    var at = function (title) { for (var i = 0; i < B.length; i++) if (B[i].kind === 'h1' && B[i].text.indexOf(title) > 0) return i + 1; return B.length; };
+    B.splice(at('Подбор продольной') + 1, 0, imgs[3]);
+    B.splice(at('Усилия') + 1, 0, imgs[0], imgs[1], imgs[2]);
+    return { title: 'Расчёт армирования железобетонной балки', meta: meta, blocks: B };
+  });
+}
+
 /* =====================================================================
    Страница «Прогиб балки»
    ===================================================================== */
@@ -582,12 +904,10 @@ function initDefl() {
   var IDS = ['shape', 'b', 'h', 'bfc', 'hfc', 'bft', 'hft', 'L', 'loadType', 'g', 'p', 's', 'limit', 'interp', 'nLim',
              'method', 'kred', 'a', 'd', 'n1', 'n2', 'n3', 'hum', 'concrete'];
 
-  // Данные, переданные со страницы армирования
-  var params = new URLSearchParams(location.search), came = false;
-  IDS.forEach(function (id) {
-    if (params.has(id)) { $(id).value = params.get(id); came = true; }
-  });
-  if (came && !params.has('g')) { $('g').value = ''; $('p').value = ''; $('s').value = ''; }
+  // Данные из адреса (например, со страницы армирования) или сохранённые в браузере
+  var state = initState('defl', IDS), last = null;
+  if (state.fromUrl && !state.params.has('g')) { $('g').value = ''; $('p').value = ''; $('s').value = ''; }
+  setupShare('defl', IDS);
 
   function limitTxt(m) {
     var den = m.sc.Lmm / m.fu;
@@ -654,6 +974,7 @@ function initDefl() {
 
   function render() {
     var s = readForm(IDS), m = deflection(s);
+    last = { s: s, m: m };
     shapeFields(m.g);
     $('grp-coef').hidden = m.exact;
     $('grp-exact').hidden = !m.exact;
@@ -675,8 +996,79 @@ function initDefl() {
     $('out-diag').innerHTML = diagHtml(m);
   }
 
+  setupReport(function () { return deflReport(last, reportMeta()); }, function () { return 'Прогиб балки'; });
   $('form').addEventListener('input', render);
   render();
+}
+
+/* ---------- Отчёт «Прогиб балки» ---------- */
+function deflReport(last, meta) {
+  if (!last || !last.m.res) return null;
+  var s = last.s, m = last.m, d = m.res, g = m.g, sc = m.sc;
+  var u = sc.isQ ? ' кН/м' : ' кН', B = [];
+  var limitWay = m.manual ? 'задан вручную: L/' + fmt(num(s.nLim), 0)
+    : 'по табл. Д.1 СП 20.13330.2016, поз. 2, для помещений высотой ' + (s.limit === 'high' ? 'более 6 м' : 'до 6 м') +
+      ', интерполяция ' + (s.interp === 'den' ? 'знаменателей' : 'предельных прогибов');
+  B.push({ kind: 'h1', text: '1. Исходные данные' });
+  var rows = sectionRows(g).concat([
+    ['Расчётная схема', 'однопролётная шарнирно опёртая балка'],
+    ['Пролёт L', fmt(sc.L, 2) + ' м'],
+    ['Бетон', 'тяжёлый ' + m.conc[0] + ', Eb = ' + fmt(m.conc[3] * 1000, 0) + ' МПа (табл. 6.11 СП 63.13330.2018)'],
+    ['Нормативная постоянная нагрузка', fmt(m.gk, 2) + u],
+    ['Нормативная полезная нагрузка (табл. 8.3)', fmt(m.pk, 2) + u],
+    ['Нормативная снеговая нагрузка', fmt(m.sk, 2) + u],
+    ['Предельный прогиб', limitWay]
+  ]);
+  if (m.exact) rows.push(['Растянутая арматура', m.lay.label + ', As = ' + fmt(m.lay.area, 0) + ' мм², a₁ = ' + fmt(g.a1, 0) + ' мм'],
+                         ['Относительная влажность воздуха', $('hum').selectedOptions[0].textContent]);
+  else rows.push(['Понижающий коэффициент к жёсткости k', fmt(d.kred, 2) + ' (п. 6.2.9 СП 430.1325800.2018)']);
+  B.push({ kind: 'kv', rows: rows });
+
+  B.push({ kind: 'h1', text: '2. Нагрузка для прогиба' });
+  B.push({ kind: 'p', text: 'По табл. Д.1 СП 20.13330.2016 прогиб определяется от постоянных и длительных нагрузок: полезная нагрузка по табл. 8.3 — с коэффициентом 0,35, снеговая — с коэффициентом 0,5.' });
+  B.push({ kind: 'p', text: (sc.isQ ? 'q' : 'P') + ' = ' + fmt(m.gk, 2) + ' + 0,35·' + fmt(m.pk, 2) + ' + 0,5·' + fmt(m.sk, 2) + ' = ' + fmt(m.ql, 2) + u +
+    '; M = ' + (sc.isQ ? 'q·L² / 8' : 'P·L / 4') + ' = ' + fmt(d.Ml / 1e6, 2) + ' кН·м.' });
+
+  B.push({ kind: 'h1', text: '3. Жёсткость и прогиб' });
+  var S = sc.isQ ? '5/48' : '1/12';
+  if (!m.exact) {
+    B.push({ kind: 'p', text: 'Жёсткость определена по понижающему коэффициенту к жёсткости бетонного сечения без учёта арматуры: D = k·Eb·I.' });
+    B.push({ kind: 'p', text: 'I = ' + fmt(d.I / 1e4, 0) + ' см⁴; D = ' + fmt(d.kred, 2) + '·' + fmt(d.Eb, 0) + '·' + fmt(d.I / 1e4, 0) + '·10⁴ = ' + fmt(d.D / 1e9, 0) + ' кН·м².' });
+    B.push({ kind: 'p', text: 'f = S·M·L² / D = ' + S + '·' + fmt(d.Ml / 1e6, 2) + '·' + fmt(sc.L, 2) + '² / ' + fmt(d.D / 1e9, 0) + '·10³ = ' + fmt(d.f, 1) + ' мм.' });
+  } else {
+    B.push({ kind: 'p', text: 'Прогиб определён по кривизне в наиболее напряжённом сечении при продолжительном действии нагрузки (раздел 8.2 СП 63.13330.2018): f = S·(1/r)·L².' });
+    B.push({ kind: 'kv', rows: [
+      ['Рабочая высота h₀', fmt(d.h0, 1) + ' мм'],
+      ['Момент от полной нормативной нагрузки Mn', fmt(d.MnAll / 1e6, 2) + ' кН·м'],
+      ['Момент образования трещин Mcrc', fmt(d.Mcrc / 1e6, 2) + ' кН·м'],
+      ['Трещины', d.cracked ? 'образуются (Mn > Mcrc)' : 'не образуются'],
+      ['ψs', d.cracked ? fmt(d.psi, 3) : '—'],
+      ['Высота сжатой зоны xm', d.cracked ? fmt(d.xm, 1) + ' мм' : '—'],
+      [d.cracked ? 'Eb,red = Rb,ser / εb1,red' : 'Eb1 = Eb / (1 + φb,cr)', fmt(d.Emod, 0) + ' МПа'],
+      ['Ired', fmt(d.Ired / 1e4, 0) + ' см⁴'],
+      ['Жёсткость D', fmt(d.D / 1e9, 0) + ' кН·м²'],
+      ['Кривизна 1/r = M / D', fmt(d.curv * 1e6, 3) + '·10⁻³ 1/м'],
+      ['Прогиб f = ' + S + '·(1/r)·L²', fmt(d.f, 1) + ' мм']
+    ] });
+  }
+  B.push({ kind: 'p', text: 'Предельный прогиб: fu = L/' + fmt(sc.Lmm / d.fu, 1) + ' = ' + fmt(d.fu, 1) + ' мм.' });
+  B.push({ kind: 'check', text: 'f = ' + fmt(d.f, 1) + ' мм ' + (d.pass ? '≤' : '>') + ' fu = ' + fmt(d.fu, 1) + ' мм — требование по прогибу ' + (d.pass ? 'выполняется.' : 'не выполняется.'), pass: d.pass });
+
+  var sh = shapes(sc.isQ);
+  var jobs = [
+    reportImg(svgFrom(schemeSvg(sc.isQ, (sc.isQ ? 'q = ' : 'P = ') + fmt(m.ql, 2) + u, sc.L)), 600, 120, 'Расчётная схема, нагрузка для прогиба'),
+    reportImg(diagramSvg(sh.m, 0, 'Mmax = ' + fmt(d.Ml / 1e6, 1) + ' кН·м'), 620, 128, 'Эпюра изгибающих моментов M, кН·м'),
+    reportImg(diagramSvg(sh.f, 0, 'fmax = ' + fmt(d.f, 1) + ' мм'), 620, 128, 'Эпюра прогибов, мм')
+  ];
+  var secSvg = $('out-section').querySelector('svg');
+  if (secSvg) jobs.push(reportImg(secSvg, +secSvg.getAttribute('width'), +secSvg.getAttribute('height'), 'Поперечное сечение, мм'));
+  return Promise.all(jobs).then(function (imgs) {
+    var i3 = B.findIndex(function (b) { return b.kind === 'h1' && b.text.indexOf('Жёсткость') > 0; });
+    var i2 = B.findIndex(function (b) { return b.kind === 'h1' && b.text.indexOf('Нагрузка') > 0; });
+    if (imgs[3]) B.splice(i3 + 1, 0, imgs[3]);
+    B.splice(i2 + 3, 0, imgs[0], imgs[1], imgs[2]);
+    return { title: 'Расчёт прогиба железобетонной балки', meta: meta, blocks: B };
+  });
 }
 
 /* =====================================================================
@@ -697,6 +1089,8 @@ function checkDeflection(s) {
 
 function initCheck() {
   var IDS = ['f', 'L', 'elem', 'limit', 'interp', 'nLim'];
+  initState('check', IDS);
+  setupShare('check', IDS);
 
   $('tbl-limit').innerHTML = [['не более 1', '1/120', '1/120'], ['3', '1/150', '1/150'], ['6', '1/200', '1/200'],
     ['12', '1/250', 'интерполяция'], ['24', '1/300', '1/250'], ['36 и более', '1/300', '1/300']].map(function (r) {

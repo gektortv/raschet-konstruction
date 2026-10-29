@@ -7,7 +7,7 @@
 <meta name="description" content="Подбор продольной арматуры железобетонной балки по СП 63.13330.2018: прямоугольное, тавровое и двутавровое сечения, эпюры M и Q.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body data-page="reinf">
 
@@ -15,10 +15,9 @@
   <div class="top-in">
     <a class="brand" href="index.html">Расчёт ЖБК</a>
     <nav class="nav" aria-label="Разделы">
-      <a href="index.html">Каталог</a>
-      <a href="armirovanie-balki.html" class="on" aria-current="page">Армирование балки</a>
-      <a href="progib-balki.html">Прогиб балки</a>
-      <a href="proverka-progiba.html">Проверка прогиба</a>
+      <a href="index.html" class="on" aria-current="page">Расчёты</a>
+      <a href="primery.html">Проверочные примеры</a>
+      <a href="stati.html">Статьи</a>
       <a href="materialy.html">Материалы</a>
     </nav>
   </div>
@@ -27,7 +26,7 @@
 <main>
   <div class="head">
     <h1>Армирование балки</h1>
-    <div class="sub">Подбор продольной растянутой арматуры по прочности нормального сечения · однопролётная шарнирно опёртая балка · СП 63.13330.2018</div>
+    <div class="sub">Продольная арматура по нормальному сечению и хомуты по наклонному · однопролётная шарнирно опёртая балка · СП 63.13330.2018</div>
   </div>
 
   <div class="layout">
@@ -106,6 +105,16 @@
           <option value="0.9">0,9 — продолжительное действие нагрузки</option>
         </select>
       </div>
+
+      <div class="grp sep">Поперечная арматура (хомуты)</div>
+      <div class="two">
+        <div class="fld"><label for="swClass">Класс хомутов</label><select id="swClass"><option value="A240">A240</option><option value="A400" selected>A400</option><option value="A500">A500</option></select></div>
+        <div class="fld"><label for="dsw">Диаметр, мм</label><select id="dsw"><option value="6">6</option><option value="8" selected>8</option><option value="10">10</option><option value="12">12</option><option value="14">14</option><option value="16">16</option></select></div>
+      </div>
+      <div class="two">
+        <div class="fld"><label for="nsw">Число ветвей в сечении</label><input id="nsw" type="number" inputmode="numeric" min="1" step="1" value="2"></div>
+        <div class="fld"><label for="sw">Шаг у опоры sw, мм</label><input id="sw" type="number" inputmode="numeric" min="10" step="5" value="150"></div>
+      </div>
       <div class="used">
         <div class="cap">В расчёте, с учётом γb1</div>
         <div class="kv2" id="mat-used"></div>
@@ -127,17 +136,45 @@
         <h2>Расчётная схема и эпюры</h2>
         <div id="out-diag"></div>
       </section>
+      <section class="card" aria-label="Поперечная арматура">
+        <h2>Поперечная арматура</h2>
+        <div class="stack" style="gap: 18px" id="out-shear"></div>
+      </section>
       <div id="out-next"></div>
+      <section class="card" aria-label="Отчёт и ссылка на расчёт">
+        <h2>Отчёт</h2>
+        <div class="two">
+          <div class="fld"><label for="rep-object">Объект</label><input id="rep-object" type="text" placeholder="Название и адрес объекта"></div>
+          <div class="fld"><label for="rep-author">Выполнил</label><input id="rep-author" type="text" placeholder="Фамилия И. О."></div>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn" id="rep-docx">Скачать Word</button>
+          <button type="button" class="btn" id="rep-pdf">Скачать PDF</button>
+          <button type="button" class="btn-sec" id="rep-print">Печать</button>
+        </div>
+        <div class="hint" id="rep-msg" role="status"></div>
+        <div class="actions">
+          <button type="button" class="btn-sec" id="share">Скопировать ссылку на расчёт</button>
+          <button type="button" class="btn-sec" id="reset">Сбросить данные</button>
+        </div>
+        <div class="hint" id="share-msg" role="status"></div>
+        <div class="hint">Введённые данные сохраняются в этом браузере и восстанавливаются при следующем открытии страницы.</div>
+      </section>
+
     </div>
   </div>
 
   <div class="notes">
     <div>Границы применимости: однопролётная шарнирно опёртая балка без предварительного напряжения, одиночное армирование. Расстояние от боковых граней до центра крайних стержней принято равным a₁. В двутавровом сечении растянутая полка в расчёте прочности не учитывается, арматура размещается по её ширине.</div>
     <div>Арматура в несколько рядов: стержни верхних рядов стоят над стержнями нижнего, в каждом ряду не меньше двух стержней. Расстояния в свету по п. 10.3.5: не менее диаметра и 25 мм для двух нижних рядов, 50 мм для третьего ряда. Рабочая высота h₀ отсчитывается от центра тяжести всей растянутой арматуры.</div>
-    <div>Поперечная арматура не рассчитывается. Сортамент для подбора: Ø10–40 мм, от 2 до 8 стержней в ряду. Результат не заменяет проверку расчёта инженером.</div>
+    <div>Хомуты рассчитываются по наклонному сечению у опоры по пп. 8.1.31–8.1.35, поперечная сила принимается по оси опоры, нагрузка q — сплошная равномерная. Сортамент для подбора: Ø10–40 мм, от 2 до 8 стержней в ряду. Результат не заменяет проверку расчёта инженером.</div>
   </div>
 </main>
+<div class="paper" id="rep-preview" hidden></div>
 
-<script src="app.js?v=5"></script>
+<footer class="foot"><div class="foot-in">Расчёты выполняются в браузере, введённые данные никуда не отправляются. Результаты не заменяют проверку расчёта инженером.</div></footer>
+<script src="docx.js?v=7"></script>
+<script src="pdf.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

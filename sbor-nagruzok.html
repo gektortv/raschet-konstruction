@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Сбор нагрузок на перекрытие онлайн по СП 20.13330.2016</title>
+<meta name="description" content="Сбор нагрузок на перекрытие: слои пола и плиты, перегородки, полезная нагрузка по табл. 8.3, расчётная, нормативная и длительная нагрузка, перевод на балку.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css?v=7">
+</head>
+<body data-page="loads">
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="index.html">Расчёт ЖБК</a>
+    <nav class="nav" aria-label="Разделы">
+      <a href="index.html" class="on" aria-current="page">Расчёты</a>
+      <a href="primery.html">Проверочные примеры</a>
+      <a href="stati.html">Статьи</a>
+      <a href="materialy.html">Материалы</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="head">
+    <h1>Сбор нагрузок на перекрытие</h1>
+    <div class="sub">Постоянные нагрузки по слоям, перегородки и полезная нагрузка · расчётная, нормативная и для прогиба · перевод на балку · СП 20.13330.2016</div>
+  </div>
+
+  <div class="layout">
+    <form class="card form wide-form" id="form" aria-label="Исходные данные" onsubmit="return false">
+      <h2>Исходные данные</h2>
+      <div class="grp">Постоянные нагрузки</div>
+      <div class="hint">Для каждого слоя задайте толщину и удельный вес или сразу нагрузку в кПа. Коэффициент γf — по табл. 7.1.</div>
+      <div class="stack" id="layers"></div>
+      <div class="actions"><button type="button" class="btn-sec" id="add-layer">Добавить слой</button></div>
+
+      <div class="grp sep">Перегородки</div>
+      <div class="two">
+        <div class="fld"><label for="part">Нагрузка от перегородок, кПа</label><input id="part" type="number" inputmode="decimal" min="0" step="0.05" value="0.5"></div>
+        <div class="fld"><label for="partGf">γf</label><select id="partGf"><option value="1.1">1,1</option><option value="1.2">1,2</option><option value="1.3" selected>1,3</option></select></div>
+      </div>
+      <div class="hint">Нагрузку от перегородок допускается принимать равномерной, но не менее 0,5 кПа (п. 8.2.2).</div>
+
+      <div class="grp sep">Полезная нагрузка, табл. 8.3</div>
+      <div class="fld"><label for="live">Помещение</label><select id="live"></select></div>
+      <div class="fld"><label for="liveVal">Нормативное значение, кПа</label><input id="liveVal" type="number" inputmode="decimal" min="0" step="0.1" value="1.5"></div>
+      <div class="hint">γf = 1,3 при нормативном значении менее 2,0 кПа и 1,2 — при 2,0 кПа и более.</div>
+
+      <div class="grp sep">Погонная нагрузка на балку</div>
+      <div class="fld"><label for="B">Ширина грузовой полосы, м</label><input id="B" type="number" inputmode="decimal" min="0" step="0.1" value="6"></div>
+      <div class="two">
+        <div class="fld"><label for="bb">Ширина ребра балки, мм</label><input id="bb" type="number" inputmode="decimal" min="0" value="300"></div>
+        <div class="fld"><label for="hr">Высота ребра под плитой, мм</label><input id="hr" type="number" inputmode="decimal" min="0" value="400"></div>
+      </div>
+      <div class="two">
+        <div class="fld"><label for="bw">Удельный вес, кН/м³</label><input id="bw" type="number" inputmode="decimal" min="0" step="0.5" value="25"></div>
+        <div class="fld"><label for="bgf">γf для ребра</label><select id="bgf"><option value="1.1" selected>1,1</option><option value="1.2">1,2</option></select></div>
+      </div>
+      <div class="hint">Если балки нет, поставьте ширину или высоту ребра 0.</div>
+    </form>
+
+    <div class="col">
+      <section class="card" aria-label="Нагрузки на 1 м²">
+        <h2>Нагрузки на 1 м² перекрытия</h2>
+        <div id="out-table"></div>
+      </section>
+      <section class="card" aria-label="Результат">
+        <h2>Результат</h2>
+        <div class="stack" style="gap: 14px" id="out-result"></div>
+      </section>
+      <section class="card" aria-label="Отчёт и ссылка на расчёт">
+        <h2>Отчёт</h2>
+        <div class="two">
+          <div class="fld"><label for="rep-object">Объект</label><input id="rep-object" type="text" placeholder="Название и адрес объекта"></div>
+          <div class="fld"><label for="rep-author">Выполнил</label><input id="rep-author" type="text" placeholder="Фамилия И. О."></div>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn" id="rep-docx">Скачать Word</button>
+          <button type="button" class="btn" id="rep-pdf">Скачать PDF</button>
+          <button type="button" class="btn-sec" id="rep-print">Печать</button>
+        </div>
+        <div class="hint" id="rep-msg" role="status"></div>
+        <div class="actions">
+          <button type="button" class="btn-sec" id="share">Скопировать ссылку на расчёт</button>
+          <button type="button" class="btn-sec" id="reset">Сбросить данные</button>
+        </div>
+        <div class="hint" id="share-msg" role="status"></div>
+        <div class="hint">Введённые данные сохраняются в этом браузере и восстанавливаются при следующем открытии страницы.</div>
+      </section>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div>Коэффициенты надёжности по нагрузке для веса конструкций — по табл. 7.1, полезные нагрузки — по табл. 8.3 СП 20.13330.2016. Нагрузка для прогиба: постоянная, перегородки и пониженное значение полезной нагрузки (0,35 от нормативного, для чердаков — равное нормативному).</div>
+  </div>
+</main>
+<div class="paper" id="rep-preview" hidden></div>
+
+<footer class="foot"><div class="foot-in">Расчёты выполняются в браузере, введённые данные никуда не отправляются. Результаты не заменяют проверку расчёта инженером.</div></footer>
+<script src="docx.js?v=7"></script>
+<script src="pdf.js?v=7"></script>
+<script src="app.js?v=7"></script>
+<script src="calc2.js?v=7"></script>
+</body>
+</html>

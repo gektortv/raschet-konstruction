@@ -7,7 +7,7 @@
 <meta name="description" content="Проверка прогиба балки или плиты по предельному прогибу из табл. Д.1 СП 20.13330.2016: введите прогиб и пролёт.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body data-page="check">
 
@@ -15,10 +15,9 @@
   <div class="top-in">
     <a class="brand" href="index.html">Расчёт ЖБК</a>
     <nav class="nav" aria-label="Разделы">
-      <a href="index.html">Каталог</a>
-      <a href="armirovanie-balki.html">Армирование балки</a>
-      <a href="progib-balki.html">Прогиб балки</a>
-      <a href="proverka-progiba.html" class="on" aria-current="page">Проверка прогиба</a>
+      <a href="index.html" class="on" aria-current="page">Расчёты</a>
+      <a href="primery.html">Проверочные примеры</a>
+      <a href="stati.html">Статьи</a>
       <a href="materialy.html">Материалы</a>
     </nav>
   </div>
@@ -70,6 +69,11 @@
       <section class="card" aria-label="Результат">
         <h2>Результат</h2>
         <div class="stack" style="gap: 18px" id="out-result"></div>
+        <div class="actions">
+          <button type="button" class="btn-sec" id="share">Скопировать ссылку на проверку</button>
+          <button type="button" class="btn-sec" id="reset">Сбросить данные</button>
+        </div>
+        <div class="hint" id="share-msg" role="status"></div>
       </section>
       <section class="card" aria-label="Таблица Д.1" style="gap: 12px">
         <div>
@@ -99,17 +103,30 @@
           <div class="fld"><label for="rep-object">Объект</label><input id="rep-object" type="text" placeholder="Название и адрес объекта"></div>
           <div class="fld"><label for="rep-author">Выполнил</label><input id="rep-author" type="text" placeholder="Фамилия И. О."></div>
         </div>
+        <div class="hint" id="rep-restored" hidden>Отчёт восстановлен из этого браузера вместе с картинками.</div>
         <div class="stack" id="rep-items"></div>
         <div class="cap" id="rep-empty" hidden>Элементов пока нет.</div>
         <div class="actions">
           <button type="button" class="btn-sec" id="rep-add-plate">Добавить плиту</button>
           <button type="button" class="btn-sec" id="rep-add-beam">Добавить балку</button>
         </div>
+        <details class="paste">
+          <summary>Вставить список элементов из Excel</summary>
+          <div class="stack" style="gap: 10px; padding-top: 10px">
+            <div class="hint">Скопируйте в Excel пять столбцов — этаж, элемент (плита, балка, консоль плиты), толщина или b×h в мм, пролёт в м, прогиб в мм — и вставьте сюда. Строка заголовков пропускается сама.</div>
+            <div class="fld"><label for="rep-paste">Таблица</label><textarea id="rep-paste" rows="5" placeholder="3-й этаж	плита	260	11,6	-45,94"></textarea></div>
+            <div class="actions"><button type="button" class="btn-sec" id="rep-paste-add">Добавить из таблицы</button></div>
+            <div class="hint" id="rep-paste-msg" role="status"></div>
+          </div>
+        </details>
         <div class="actions">
-          <button type="button" class="btn" id="rep-docx">Скачать отчёт в Word</button>
-          <button type="button" class="btn-sec" id="rep-print">Печать или PDF</button>
+          <button type="button" class="btn" id="rep-docx">Скачать Word</button>
+          <button type="button" class="btn" id="rep-pdf">Скачать PDF</button>
+          <button type="button" class="btn-sec" id="rep-print">Печать</button>
         </div>
-        <div class="hint">Данные и картинки хранятся только в этой вкладке браузера и никуда не отправляются. После перезагрузки страницы их нужно ввести заново.</div>
+        <div class="hint" id="rep-msg" role="status"></div>
+        <div class="actions"><button type="button" class="btn-sec" id="rep-clear">Очистить отчёт</button></div>
+        <div class="hint">Отчёт вместе с картинками сохраняется в этом браузере и восстанавливается при следующем открытии страницы. На сервер ничего не отправляется.</div>
       </section>
       <section class="card col" aria-label="Предпросмотр отчёта">
         <h2>Предпросмотр</h2>
@@ -124,7 +141,10 @@
   </div>
 </main>
 
-<script src="app.js?v=5"></script>
-<script src="report.js?v=5"></script>
+<footer class="foot"><div class="foot-in">Расчёты выполняются в браузере, введённые данные никуда не отправляются. Результаты не заменяют проверку расчёта инженером.</div></footer>
+<script src="docx.js?v=7"></script>
+<script src="pdf.js?v=7"></script>
+<script src="app.js?v=7"></script>
+<script src="report.js?v=7"></script>
 </body>
 </html>
