@@ -7,7 +7,7 @@
 <meta name="description" content="Проверка прогиба балки или плиты по предельному прогибу из табл. Д.1 СП 20.13330.2016: введите прогиб и пролёт.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body data-page="check">
 
@@ -27,7 +27,7 @@
 <main>
   <div class="head">
     <h1>Проверка прогиба</h1>
-    <div class="sub">Введите прогиб из своего расчёта и пролёт — получите предельный прогиб по табл. Д.1 СП 20.13330.2016 и ответ, проходит ли элемент.</div>
+    <div class="sub">Введите прогиб из своего расчёта и пролёт — получите предельный прогиб по табл. Д.1 СП 20.13330.2016 и ответ, проходит ли элемент. Ниже можно собрать отчёт по нескольким элементам с картинками и скачать его в Word.</div>
   </div>
 
   <div class="layout">
@@ -86,12 +86,45 @@
     </div>
   </div>
 
+  <div class="rep-wrap" id="report">
+    <div class="head">
+      <h2 class="h2-big">Отчёт по прогибам</h2>
+      <div class="sub">Добавьте плиты и балки, приложите картинки из расчётного комплекса и скачайте отчёт в Word. Предельные прогибы считаются по настройкам формы выше: высота помещений и способ интерполяции.</div>
+    </div>
+    <div class="layout">
+      <section class="card form" aria-label="Состав отчёта">
+        <h2>Состав отчёта</h2>
+        <div class="stack" id="rep-meta">
+          <div class="fld"><label for="rep-title">Название отчёта</label><input id="rep-title" type="text" value="Проверка прогибов плит перекрытия и балок"></div>
+          <div class="fld"><label for="rep-object">Объект</label><input id="rep-object" type="text" placeholder="Название и адрес объекта"></div>
+          <div class="fld"><label for="rep-author">Выполнил</label><input id="rep-author" type="text" placeholder="Фамилия И. О."></div>
+        </div>
+        <div class="stack" id="rep-items"></div>
+        <div class="cap" id="rep-empty" hidden>Элементов пока нет.</div>
+        <div class="actions">
+          <button type="button" class="btn-sec" id="rep-add-plate">Добавить плиту</button>
+          <button type="button" class="btn-sec" id="rep-add-beam">Добавить балку</button>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn" id="rep-docx">Скачать отчёт в Word</button>
+          <button type="button" class="btn-sec" id="rep-print">Печать или PDF</button>
+        </div>
+        <div class="hint">Данные и картинки хранятся только в этой вкладке браузера и никуда не отправляются. После перезагрузки страницы их нужно ввести заново.</div>
+      </section>
+      <section class="card col" aria-label="Предпросмотр отчёта">
+        <h2>Предпросмотр</h2>
+        <div class="paper" id="rep-preview"></div>
+      </section>
+    </div>
+  </div>
+
   <div class="notes">
     <div>Для промежуточных пролётов предельный прогиб определяется линейной интерполяцией: по умолчанию — самих предельных прогибов в миллиметрах, как сказано в примечании к табл. Д.1; по выбору — знаменателей n в L/n. Второй способ даёт немного больший предельный прогиб. Для консоли вместо l принимается удвоенный вылет (примечание 1 к табл. Д.1).</div>
     <div>Проверяются только эстетико-психологические требования. Технологические, конструктивные и физиологические требования, если они есть, проверяются отдельно. Результат не заменяет проверку расчёта инженером.</div>
   </div>
 </main>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=5"></script>
+<script src="report.js?v=5"></script>
 </body>
 </html>

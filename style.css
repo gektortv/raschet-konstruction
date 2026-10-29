@@ -136,3 +136,54 @@ tr.on td { background: var(--row-on); font-weight: 600; }
 .verdict .v { font-size: 26px; font-weight: 600; line-height: 1.2; }
 .verdict.yes .v { color: var(--ok); }
 .verdict.no .v { color: var(--bad-ink); }
+
+/* Отчёт по прогибам */
+.rep-wrap { display: flex; flex-direction: column; gap: 16px; padding-top: 8px; }
+.h2-big { font-size: 24px; font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn-sec { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; border-radius: 6px; border: 1px solid var(--field); background: #FFFFFF; color: var(--ink); font-size: 15px; font-family: var(--sans); cursor: pointer; }
+.btn-sec:hover { border-color: var(--accent); color: var(--accent); }
+button.btn { border: 0; cursor: pointer; font-family: var(--sans); }
+.rep-item { display: flex; flex-direction: column; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--ground); }
+.rep-item:focus-within { border-color: var(--accent); }
+.rep-item-h { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.rep-item .fld input, .rep-item .fld select { background: #FFFFFF; }
+.rep-item input[type="file"] { height: auto; padding: 10px; font-family: var(--sans); font-size: 14px; }
+.chk { display: flex; align-items: center; gap: 10px; font-size: 14px; min-height: 32px; }
+.chk input { width: 18px; height: 18px; }
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.thumbs:empty { display: none; }
+.thumb { display: flex; flex-direction: column; gap: 6px; background: #FFFFFF; border: 1px solid var(--line); border-radius: 6px; padding: 6px; }
+.thumb img { width: 100%; height: 90px; object-fit: contain; background: #F3F5F7; }
+.thumb .btn-sec { min-height: 36px; font-size: 13px; }
+.rep-res { font-size: 14px; }
+.ok-t { color: var(--ok); font-weight: 500; }
+.bad-t { color: var(--bad); font-weight: 500; }
+
+/* Лист отчёта: предпросмотр и печать */
+.paper { background: #FFFFFF; border: 1px solid var(--line); border-radius: 4px; padding: 28px 32px; font-family: 'Times New Roman', Times, serif; font-size: 15px; line-height: 1.45; color: #000000; display: flex; flex-direction: column; gap: 8px; }
+.paper h1 { font-size: 21px; text-align: center; margin: 0 0 10px; }
+.paper h2 { font-size: 18px; margin: 14px 0 2px; }
+.paper h3.grp { font-size: 17px; margin: 10px 0 0; }
+.paper h4 { font-size: 15px; font-style: italic; margin: 6px 0 0; }
+.paper p { margin: 0; text-align: justify; }
+.paper p.res { font-weight: 700; text-align: left; }
+.paper p.res.yes { color: #0B6B3A; }
+.paper p.res.no, .paper p.warn { color: #B42318; }
+.paper figure { margin: 6px 0 0; text-align: center; }
+.paper figure img { max-width: 100%; max-height: 520px; }
+.paper p.fcap { text-align: center; font-size: 14px; margin-bottom: 6px; }
+.paper table { font-family: 'Times New Roman', Times, serif; font-size: 13px; }
+.paper th { font-family: 'Times New Roman', Times, serif; font-size: 13px; color: #000000; font-weight: 700; border: 1px solid #000000; background: #E6ECF5; white-space: normal; }
+.paper td { border: 1px solid #000000; white-space: normal; }
+
+@media print {
+  @page { size: A4; margin: 20mm 15mm 20mm 30mm; }
+  body { background: #FFFFFF; }
+  body * { visibility: hidden; }
+  #rep-preview, #rep-preview * { visibility: visible; }
+  #rep-preview { position: absolute; left: 0; top: 0; width: 100%; border: 0; padding: 0; }
+  .paper .scroll { overflow: visible; }
+  .paper figure, .paper tr { break-inside: avoid; }
+  .paper h2, .paper h3, .paper h4 { break-after: avoid; }
+}
