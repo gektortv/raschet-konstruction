@@ -1095,8 +1095,8 @@ function checkDeflection(s) {
 
 function initCheck() {
   var IDS = ['f', 'L', 'elem', 'limit', 'interp', 'nLim'];
-  initState('check', IDS);
-  setupShare('check', IDS);
+  initState('check-v2', IDS);
+  setupShare('check-v2', IDS);
 
   $('tbl-limit').innerHTML = [['не более 1', '1/120', '1/120'], ['3', '1/150', '1/150'], ['6', '1/200', '1/200'],
     ['12', '1/250', 'интерполяция'], ['24', '1/300', '1/250'], ['36 и более', '1/300', '1/300']].map(function (r) {
